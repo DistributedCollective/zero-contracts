@@ -29,10 +29,14 @@ library MyntLib {
         address _toToken,
         IMassetManager.PermitParams calldata _permitParams
     ) internal returns (uint256) {
+        IDLLR dllrIntermediary = IDLLR(_myntMassetManager.mAssetTokenIntermediary());
         IDLLR dllr = IDLLR(_myntMassetManager.getToken());
+
         uint256 thisBalanceBefore = dllr.balanceOf(address(this));
         address thisAddress = address(this);
-        dllr.transferWithPermit(
+
+        IDLLR tokenTransferWithPermit = address(dllrIntermediary) != address(0) ? dllrIntermediary : dllr;
+        tokenTransferWithPermit.transferWithPermit(
             msg.sender,
             thisAddress,
             _dllrAmount,

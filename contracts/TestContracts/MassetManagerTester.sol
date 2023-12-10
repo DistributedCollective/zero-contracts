@@ -42,11 +42,57 @@ contract NueMockToken is ERC20("Nuestro", "NUE"), ERC20Permit("Nuestro"), Ownabl
     //TODO: add EIP-2612 Permit functionality
 }
 
+contract NueMockTokenIntermediary is ERC20("Nuestro", "NUE"), ERC20Permit("Nuestro"), Ownable {
+    NueMockToken public nueMockToken;
+    constructor(address _nueMockToken) public {
+        nueMockToken = NueMockToken(_nueMockToken);
+    }
+
+    function mint(address _account, uint256 _amount) public onlyOwner {
+        _mint(_account, _amount);
+    }
+
+    function burn(address _account, uint256 _amount) public onlyOwner {
+        _burn(_account, _amount);
+    }
+
+    function getChainId() external pure returns (uint256 chainID) {
+        //return _chainID(); // it’s private
+        assembly {
+            chainID := chainid()
+        }
+    }
+
+    function transferWithPermit(
+        address _from,
+        address _to,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external {
+        nueMockToken.transferWithPermit(
+            _from,
+            _to,
+            _amount,
+            _deadline,
+            _v,
+            _r,
+            _s
+        );
+    }
+
+    //TODO: add EIP-2612 Permit functionality
+}
+
 contract MassetManagerTester is IMassetManager {
     NueMockToken public nueMockToken;
+    NueMockTokenIntermediary public nueMockTokenIntermediary;
 
     constructor() public {
         nueMockToken = new NueMockToken();
+        nueMockTokenIntermediary = new NueMockTokenIntermediary(address(nueMockToken));
     }
 
     function mintTo(
@@ -75,5 +121,9 @@ contract MassetManagerTester is IMassetManager {
         nueMockToken.burn(msg.sender, _massetQuantity);
 
         return _massetQuantity;
+    }
+
+    function mAssetTokenIntermediary() external view override returns(address) {
+        return address(nueMockTokenIntermediary);        
     }
 }

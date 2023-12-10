@@ -10,6 +10,7 @@ const TroveManagerTester = artifacts.require("TroveManagerTester");
 const ZUSDTokenTester = artifacts.require("./ZUSDTokenTester");
 const MassetManagerTester = artifacts.require("MassetManagerTester");
 const NueMockToken = artifacts.require("NueMockToken");
+const NueMockTokenIntermediary = artifacts.require("NueMockTokenIntermediary");
 
 const th = testHelpers.TestHelper;
 
@@ -69,6 +70,7 @@ contract("BorrowerOperations", async accounts => {
   let zeroToken;
   let massetManager;
   let nueMockToken;
+  let nueMockTokenIntermediary;
 
   let contracts;
 
@@ -172,7 +174,9 @@ contract("BorrowerOperations", async accounts => {
       MIN_NET_DEBT = await borrowerOperations.MIN_NET_DEBT();
       BORROWING_FEE_FLOOR = await borrowerOperations.BORROWING_FEE_FLOOR();
       const nueMockTokenAddress = await massetManager.nueMockToken();
+      const nueMockTokenIntermediaryAddress = await massetManager.nueMockTokenIntermediary();
       nueMockToken = await NueMockToken.at(nueMockTokenAddress);
+      nueMockTokenIntermediary = await NueMockTokenIntermediary.at(nueMockTokenIntermediaryAddress);
 
       await borrowerOperations.setMassetManagerAddress(massetManager.address);
     });
@@ -2069,7 +2073,7 @@ contract("BorrowerOperations", async accounts => {
       const decreaseAmount = toBN(dec(50, 16));
 
       // Alice adjusts trove coll and debt decrease (-0.5 ETH, -50ZUSD)
-      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, borrowerOperations.address, decreaseAmount.toString());
+      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, nueMockTokenIntermediary.address, decreaseAmount.toString());
       await th.repayZusdFromDLLR(alice, contracts, decreaseAmount, permission);
 
       const debtAfter = await getTroveEntireDebt(alice);
@@ -3504,7 +3508,7 @@ contract("BorrowerOperations", async accounts => {
 
       const decreaseAmount = toBN(dec(50, 16));
       // Alice adjusts trove coll and debt decrease (-0.5 ETH, -50ZUSD)
-      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, borrowerOperations.address, decreaseAmount.toString());
+      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, nueMockTokenIntermediary.address, decreaseAmount.toString());
       await borrowerOperations.adjustNueTrove(
         th._100pct,
         dec(500, "finney"),
@@ -4244,7 +4248,7 @@ contract("BorrowerOperations", async accounts => {
 
       // Alice attempts to close trove
       const value = (await troveManager.getTroveDebt(alice)).sub(await borrowerOperations.ZUSD_GAS_COMPENSATION());
-      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, borrowerOperations.address, value.toString());
+      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, nueMockTokenIntermediary.address, value.toString());
       await borrowerOperations.closeNueTrove(permission, { from: alice });
 
       const aliceCollAfter = await getTroveEntireColl(alice);

@@ -17,6 +17,7 @@ const timeMachine = require("ganache-time-traveler");
 
 const MassetManagerTester = artifacts.require("MassetManagerTester");
 const NueMockToken = artifacts.require("NueMockToken");
+const NueMockTokenIntermediary = artifacts.require("NueMockTokenIntermediary");
 
 const ZERO = toBN('0');
 const ZERO_ADDRESS = th.ZERO_ADDRESS;
@@ -57,6 +58,7 @@ contract('StabilityPool', async accounts => {
   let communityIssuance;
   let massetManager;
   let nueMockToken;
+  let nueMockTokenIntermediary;
 
   let gasPriceInWei;
 
@@ -100,7 +102,9 @@ contract('StabilityPool', async accounts => {
       massetManager = contracts.massetManager;
       await borrowerOperations.setMassetManagerAddress(massetManager.address);
       const nueMockTokenAddress = await massetManager.nueMockToken();
+      const nueMockTokenIntermediaryAddress = await massetManager.nueMockTokenIntermediary();
       nueMockToken = await NueMockToken.at(nueMockTokenAddress);
+      nueMockTokenIntermediary = await NueMockToken.at(nueMockTokenIntermediaryAddress);
 
       await deploymentHelper.connectZEROContracts(ZEROContracts);
       await deploymentHelper.connectCoreContracts(contracts, ZEROContracts);
@@ -138,7 +142,7 @@ contract('StabilityPool', async accounts => {
       // open a trove to get ZUSD and deposit ZUSD to Mynt to get DLLR
       await openNueTrove({ extraZUSDAmount: spAmount, ICR: toBN(dec(2, 18)), extraParams: { from: alice } });
       // get ERC2612 permission from alice for stability pool to spend DLLR amount
-      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, stabilityPool.address, spAmount.toString());
+      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, nueMockTokenIntermediary.address, spAmount.toString());
 
       // --- TEST ---
       // check user's deposit record before
