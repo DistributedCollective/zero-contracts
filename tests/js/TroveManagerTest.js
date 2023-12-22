@@ -8,7 +8,7 @@ const ZUSDTokenTester = artifacts.require("./ZUSDTokenTester.sol");
 
 const MassetManagerTester = artifacts.require("MassetManagerTester");
 const NueMockToken = artifacts.require("NueMockToken");
-const NueMockTokenIntermediary = artifacts.require("NueMockTokenIntermediary");
+const NueMockTokenTransferWithPermit = artifacts.require("NueMockTokenTransferWithPermit");
 
 const th = testHelpers.TestHelper;
 const dec = th.dec;
@@ -50,7 +50,7 @@ contract('TroveManager', async accounts => {
   let hintHelpers;
   let massetManager;
   let nueMockToken;
-  let nueMockTokenIntermediary;
+  let nueMockTokenTansferWithPermit;
 
   let dennis_signer;
 
@@ -102,9 +102,9 @@ contract('TroveManager', async accounts => {
     massetManager = contracts.massetManager;
     await borrowerOperations.setMassetManagerAddress(massetManager.address);
     const nueMockTokenAddress = await massetManager.nueMockToken();
-    const nueMockTokenIntermediaryAddress = await massetManager.nueMockTokenIntermediary();
+    const nueMockTokenTransferWithPermitAddress = await massetManager.nueMockTokenTransferWithPermit();
     nueMockToken = await NueMockToken.at(nueMockTokenAddress);
-    nueMockTokenIntermediary = await NueMockToken.at(nueMockTokenIntermediaryAddress);
+    nueMockTokenTransferWithPermit = await NueMockToken.at(nueMockTokenTransferWithPermitAddress);
 
     dennis_signer = (await ethers.getSigners())[4];
   });
@@ -2406,7 +2406,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // get ERC2612 permission from alice for stability pool to spend DLLR amount
-    const permission = await signERC2612Permit(dennis_signer, nueMockToken.address, dennis_signer.address, nueMockTokenIntermediary.address, redemptionAmount.toString());
+    const permission = await signERC2612Permit(dennis_signer, nueMockToken.address, dennis_signer.address, nueMockTokenTransferWithPermit.address, redemptionAmount.toString());
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
