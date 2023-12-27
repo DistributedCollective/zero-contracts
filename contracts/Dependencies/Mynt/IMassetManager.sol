@@ -32,5 +32,5 @@ interface IMassetManager {
         address _recipient
     ) external returns (uint256 massetRedeemed);
 
-    function mAssetTokenTransferWithPermit() external view returns(address);
+    function getMAssetTokenTransferWithPermitAddress() external view returns(address);
 }

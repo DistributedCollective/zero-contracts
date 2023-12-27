@@ -123,7 +123,7 @@ contract MassetManagerTester is IMassetManager {
         return _massetQuantity;
     }
 
-    function mAssetTokenTransferWithPermit() external view override returns(address) {
+    function getMAssetTokenTransferWithPermitAddress() external view override returns(address) {
         return address(nueMockTokenTransferWithPermit);        
     }
 }

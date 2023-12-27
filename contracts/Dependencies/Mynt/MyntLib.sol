@@ -15,7 +15,7 @@ library MyntLib {
      *
      * @param _myntMassetManager Mynt protocol MassetManager contract address - needed for integration
      * @param _dllrAmount The amount of the DLLR (mAsset) token that will be burned in exchange for _toToken
-     * @param _toToken bAsset token address to wothdraw from DLLR
+     * @param _toToken bAsset token address to withdraw from DLLR
      * @param _permitParams EIP-2612 permit params:
      *        _deadline Expiration time of the signature.
      *        _v Last 1 byte of ECDSA signature.
@@ -29,7 +29,7 @@ library MyntLib {
         address _toToken,
         IMassetManager.PermitParams calldata _permitParams
     ) internal returns (uint256) {
-        IDLLR dllrTransferWithPermit = IDLLR(_myntMassetManager.mAssetTokenTransferWithPermit());
+        IDLLR dllrTransferWithPermit = IDLLR(_myntMassetManager.getMAssetTokenTransferWithPermitAddress());
         IDLLR dllr = IDLLR(_myntMassetManager.getToken());
 
         uint256 thisBalanceBefore = dllr.balanceOf(address(this));
