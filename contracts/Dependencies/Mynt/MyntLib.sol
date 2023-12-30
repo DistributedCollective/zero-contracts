@@ -3,7 +3,7 @@
 pragma solidity 0.6.11;
 
 import "./IMassetManager.sol";
-import "./IDllrTransferWithPermit.sol";
+import "./IMyntTokenTransferWithPermit.sol";
 import "../SafeMath.sol";
 
 library MyntLib {
@@ -29,7 +29,7 @@ library MyntLib {
         address _toToken,
         IMassetManager.PermitParams calldata _permitParams
     ) internal returns (uint256) {
-        IDllrTransferWithPermit dllrTransferWithPermit = IDllrTransferWithPermit(_myntMassetManager.getMAssetTokenTransferWithPermitAddress());
+        IMyntTokenTransferWithPermit dllrTransferWithPermit = IMyntTokenTransferWithPermit(_myntMassetManager.getMAssetTokenTransferWithPermitAddress());
 
         uint256 thisBalanceBefore = dllrTransferWithPermit.balanceOf(address(this));
         address thisAddress = address(this);
