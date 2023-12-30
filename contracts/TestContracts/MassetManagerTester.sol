@@ -83,6 +83,10 @@ contract NueMockTokenTransferWithPermit is ERC20("Nuestro", "NUE"), ERC20Permit(
         );
     }
 
+    function balanceOf(address _account) public view override returns(uint256) {
+        return nueMockToken.balanceOf(_account);
+    }
+
     //TODO: add EIP-2612 Permit functionality
 }
 

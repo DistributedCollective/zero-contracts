@@ -3,7 +3,7 @@
 pragma solidity 0.6.11;
 
 import "./IMassetManager.sol";
-import "./IDLLR.sol";
+import "./IDllrTransferWithPermit.sol";
 import "../SafeMath.sol";
 
 library MyntLib {
@@ -29,14 +29,12 @@ library MyntLib {
         address _toToken,
         IMassetManager.PermitParams calldata _permitParams
     ) internal returns (uint256) {
-        IDLLR dllrTransferWithPermit = IDLLR(_myntMassetManager.getMAssetTokenTransferWithPermitAddress());
-        IDLLR dllr = IDLLR(_myntMassetManager.getToken());
+        IDllrTransferWithPermit dllrTransferWithPermit = IDllrTransferWithPermit(_myntMassetManager.getMAssetTokenTransferWithPermitAddress());
 
-        uint256 thisBalanceBefore = dllr.balanceOf(address(this));
+        uint256 thisBalanceBefore = dllrTransferWithPermit.balanceOf(address(this));
         address thisAddress = address(this);
 
-        IDLLR tokenTransferWithPermit = address(dllrTransferWithPermit) != address(0) ? dllrTransferWithPermit : dllr;
-        tokenTransferWithPermit.transferWithPermit(
+        dllrTransferWithPermit.transferWithPermit(
             msg.sender,
             thisAddress,
             _dllrAmount,
@@ -46,7 +44,7 @@ library MyntLib {
             _permitParams.s
         );
         require(
-            dllr.balanceOf(thisAddress).sub(thisBalanceBefore) == _dllrAmount,
+            dllrTransferWithPermit.balanceOf(thisAddress).sub(thisBalanceBefore) == _dllrAmount,
             "DLLR transferred amount validation failed"
         );
         return _myntMassetManager.redeemTo(_toToken, _dllrAmount, msg.sender);
