@@ -308,6 +308,48 @@ const zeroFeesUpdateSip0066 = async (hre: HardhatRuntimeEnvironment): Promise<IS
     return args;
 };
 
+const sipSOV3564 = async (hre: HardhatRuntimeEnvironment): Promise<ISipArgument> => {
+    const {
+        ethers,
+        deployments: { get },
+    } = hre;
+
+    // @todo for the mainnet deployment first run `yarn deploy --tags 'StabilityPool,BorrowerOperations,TroveManager' --network rskSovrynMainnet`
+    const newStabilityPoolImplementation = (await get("StabilityPool_Implementation")).address;
+    const newBorrowerOperationsImplementation = (await get("BorrowerOperations_Implementation")).address;
+    const newTroveManagerImplementation = (await get("TroveManager_Implementation")).address;
+
+    console.log(`New stability pool implementation: ${newStabilityPoolImplementation}`);
+    console.log(`New borrower operations implementation: ${newBorrowerOperationsImplementation}`);
+    console.log(`New trove manager implementation: ${newTroveManagerImplementation}`);
+
+    const stabilityPoolProxyAddress = (await get("StabilityPool_Proxy")).address;
+    const borrowerOperationsAddress = (await get("BorrowerOperations_Proxy")).address;
+    const troveManagerAddress = (await get("TroveManager_Proxy")).address;
+
+    const args: ISipArgument = {
+        args: {
+            targets: [stabilityPoolProxyAddress, borrowerOperationsAddress, troveManagerAddress],
+            values: [0, 0],
+            signatures: ["setImplementation(address)", "setImplementation(address)", "setImplementation(address)"],
+            data: [
+                ethers.AbiCoder.defaultAbiCoder().encode(
+                    ["address"],
+                    [newStabilityPoolImplementation]
+                ),
+                ethers.AbiCoder.defaultAbiCoder().encode(["address"], [borrowerOperationsAddress]),
+                ethers.AbiCoder.defaultAbiCoder().encode(["address"], [troveManagerAddress]),
+            ],
+            // @todo update sip description
+            description:
+                "SIP-SOV3564: upgrade stabilityPool, borrowerOperations, troveManager",
+        },
+        governorName: "GovernorOwner",
+    };
+
+    return args;
+};
+
 const sipArgs = {
     zeroMyntIntegrationSIP,
     zeroFeesUpdate,
@@ -316,6 +358,7 @@ const sipArgs = {
     zeroFeesUpdateSip0059,
     sip0062,
     zeroFeesUpdateSip0066,
+    sipSOV3564,
 };
 
 export default sipArgs;
