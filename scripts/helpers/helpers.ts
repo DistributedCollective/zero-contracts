@@ -36,28 +36,29 @@ const sendWithMultisig = async (
     value = 0
 ) => {
     const { ethers } = hre;
-    const multisig = await ethers.getContractAt("MultiSigWallet", multisigAddress);
     const signer = await ethers.getSigner(sender);
-    const receipt = await (
-        await multisig.connect(signer).submitTransaction(contractAddress, value, data)
-    ).wait();
+    const multisig = (await ethers.getContract("MultiSigWallet", signer)) as MultiSigWallet;
+    if (multisigAddress !== undefined) {
+        multisig.attach(multisigAddress);
+    }
+    const receipt = await (await multisig.submitTransaction(contractAddress, value, data)).wait();
 
     const abi = ["event Submission(uint256 indexed transactionId)"];
     const iface = new ethers.Interface(abi);
     const parsedEvent = await getParsedEventLogFromReceipt(receipt, iface, "Submission");
-    await multisigCheckTx(
-        hre,
-        parsedEvent.transactionId.value.toNumber(),
-        await multisig.getAddress()
-    );
+    await multisigCheckTx(hre, parsedEvent.transactionId.value, await multisig.getAddress());
 };
 
 const signWithMultisig = async (hre: HardhatRuntimeEnvironment, multisigAddress, txId, sender) => {
     const { ethers } = hre;
     console.log("Signing multisig txId:", txId);
-    const multisig = await ethers.getContractAt("MultiSigWallet", multisigAddress);
+
     const signer = await ethers.getSigner(sender);
-    await (await multisig.connect(signer).confirmTransaction(txId)).wait();
+    const multisig = (await ethers.getContract("MultiSigWallet", signer)) as MultiSigWallet;
+    if (multisigAddress !== undefined) {
+        multisig.attach(multisigAddress);
+    }
+    await (await multisig.confirmTransaction(txId)).wait();
     // console.log("Required signatures:", await multisig.required());
     console.log("Signed. Details:");
     await multisigCheckTx(txId, multisig.target);
@@ -168,10 +169,10 @@ const multisigCheckTx = async (
         ethers,
         deployments: { get },
     } = hre;
-    const multisig = await ethers.getContractAt(
-        "MultiSigWallet",
-        multisigAddress === undefined ? (await get("MultiSigWallet")).address : multisigAddress
-    );
+    let multisig = (await ethers.getContract("MultiSigWallet")) as MultiSigWallet;
+    if (multisigAddress !== undefined) {
+        multisig.attach(multisigAddress);
+    }
     const transaction = await multisig.transactions(txId);
     console.log(
         "TX { ID: ",
@@ -240,8 +241,9 @@ const getTxLog = (tx, contract) => {
 const parseEthersLog = (parsed) => {
     const parsedEvent: any = {};
     for (let i = 0; i < parsed.args.length; i++) {
-        const input = parsed.eventFragment.inputs[i];
+        const input = parsed.fragment.inputs[i];
         const arg = parsed.args[i];
+
         const newObj = { ...input, ...{ value: arg } };
         parsedEvent[input.name] = newObj;
     }
@@ -399,7 +401,13 @@ const deployWithCustomProxy = async (
                 `Creating multisig tx to set ${logicDeployedName} (${tx.address}) as implementation for ${logicDeployedName} (${proxyDeployment.address}...`
             );
             log();
-            await sendWithMultisig(hre, multisigDeployment.address, proxy.address, data, deployer);
+            await sendWithMultisig(
+                hre,
+                multisigDeployment.address,
+                await proxyDeployment.address,
+                data,
+                deployer
+            );
             log(
                 `>>> DONE. Requires Multisig (${multisigDeployment.address}) signing to execute tx <<<
                  >>> DON'T PUSH/MERGE ${logicName} TO THE DEVELOPMENT BRANCH REPO UNTIL THE MULTISIG TX SUCCESSFULLY SIGNED & EXECUTED <<<`
