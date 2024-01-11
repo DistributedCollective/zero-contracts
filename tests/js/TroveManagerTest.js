@@ -50,7 +50,6 @@ contract('TroveManager', async accounts => {
   let hintHelpers;
   let massetManager;
   let nueMockToken;
-  let nueMockTokenTansferWithPermit;
 
   let dennis_signer;
 

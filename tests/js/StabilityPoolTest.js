@@ -17,7 +17,6 @@ const timeMachine = require("ganache-time-traveler");
 
 const MassetManagerTester = artifacts.require("MassetManagerTester");
 const NueMockToken = artifacts.require("NueMockToken");
-const NueMockTokenTransferWithPermit = artifacts.require("NueMockTokenTransferWithPermit");
 
 const ZERO = toBN('0');
 const ZERO_ADDRESS = th.ZERO_ADDRESS;
