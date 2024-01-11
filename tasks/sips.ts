@@ -5,6 +5,7 @@ import sipArgsList from "./sips/args/sipArgs";
 import { logTimer, delay } from "scripts/helpers/utils";
 import { parseEthersLogToValue, sendWithMultisig } from "scripts/helpers/helpers";
 import { GovernorAlpha } from "types/generated";
+import { Contract } from "ethers";
 
 const logger = new Logs().showInConsole(true);
 
@@ -14,7 +15,7 @@ task("sips:create", "Create SIP to Sovryn Governance")
         "Function name from tasks/sips/args/sipArgs.ts which returns the sip arguments"
     )
     .setAction(async ({ argsFunc }, hre) => {
-        const { governorName, args: sipArgs } = await sipArgsList[argsFunc](hre);
+        const { governor: governorName, args: sipArgs } = await sipArgsList[argsFunc](hre);
         const {
             ethers,
             deployments: { get },
@@ -37,7 +38,8 @@ task("sips:create", "Create SIP to Sovryn Governance")
             sipArgs.values,
             sipArgs.signatures,
             sipArgs.data,
-            sipArgs.description
+            sipArgs.description, 
+            { gasLimit: 1_000_000 }
         );
         const receipt = await tx.wait();
         const log = receipt!.logs[0]! as unknown as { topics: string[]; data: string };
@@ -266,4 +268,77 @@ task("sips:execute-timer", "Execute SIP with countdown")
         } else {
             logger.error(`Proposal ${proposalId} is NOT executed`);
         }
+    });
+
+task("sips:populate", "Create SIP tx object to Propose to Sovryn Governance")
+    .addParam(
+        "argsFunc",
+        "Function name from tasks/sips/args/sipArgs.ts which returns the sip arguments"
+    )
+    .setAction(async ({ argsFunc }, hre) => {
+        console.log(await sipArgsList[argsFunc](hre));
+        const { governor: governorName, args: sipArgs } = await sipArgsList[argsFunc](hre);
+        const {
+            ethers,
+            deployments: { get },
+        } = hre;
+
+        const governorDeployment = await get(governorName);
+        const governor = (await ethers.getContract(governorName)) as Contract;
+
+        logger.info("=== Creating SIP ===");
+        logger.info(`Governor Address:    ${governorDeployment.address}`);
+        logger.info(`Targets:             ${sipArgs.targets}`);
+        logger.info(`Values:              ${sipArgs.values}`);
+        logger.info(`Signatures:          ${sipArgs.signatures}`);
+        logger.info(`Data:                ${sipArgs.data}`);
+        logger.info(`Description:         ${sipArgs.description}`);
+        logger.info(`=============================================================`);
+
+        let tx = await governor.propose.populateTransaction(
+            sipArgs.targets,
+            sipArgs.values,
+            sipArgs.signatures,
+            sipArgs.data,
+            sipArgs.description,
+            { gasLimit: 6500000, gasPrice: 66e6 }
+        );
+
+        delete tx.from;
+        logger.warning("==================== populated tx data start ====================");
+        logger.info(`${tx.data}`);
+        logger.warning("==================== populated tx data end   =================");
+        return tx;
+    });
+task("sips:decode-sip-data", "Decodes SIP data and writes it to a file")
+    .addParam("data", "The ABI-encoded data to decode")
+    .setAction(async (taskArgs, hre) => {
+        const {
+            ethers,
+            deployments: { get },
+        } = hre;
+
+        // Retrieve the data from the task arguments
+        const dataToDecode = `0x${taskArgs.data.toString().substring(10)}`;
+
+        // Define the ABI components you want to decode
+        const types = ["address[]", "uint256[]", "string[]", "bytes[]", "string"];
+
+        const jsonStringify = (
+            value: any,
+            replacer?: (string | number)[] | null | undefined,
+            space?: string | number | undefined
+        ): any => {
+            return JSON.stringify(
+                value,
+                (key, value) => (typeof value === "bigint" ? value.toString() : value),
+                space
+            );
+        };
+
+        // Decode the data using ethers.js
+        const obj = ethers.AbiCoder.defaultAbiCoder().decode(types, dataToDecode);
+
+        // Write the decoded data to a file
+        console.log(jsonStringify(obj, null, 2));
     });
