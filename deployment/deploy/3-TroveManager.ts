@@ -7,7 +7,7 @@ const deploymentName = getContractNameFromScriptFileName(path.basename(__filenam
 const func: DeployFunction = async (hre) => {
     const { getNamedAccounts } = hre;
     const { deployer } = await getNamedAccounts();
-    await deployWithCustomProxy(hre, deployer, deploymentName, "UpgradableProxy", false, "", "", [
+    await deployWithCustomProxy(hre, deployer, deploymentName, "UpgradableProxy", false, "MultiSigWallet", "", [
         "1209600",
     ]);
 };
