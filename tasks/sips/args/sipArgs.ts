@@ -330,21 +330,21 @@ const sipSOV3564 = async (hre: HardhatRuntimeEnvironment): Promise<ISipArgument>
     const args: ISipArgument = {
         args: {
             targets: [stabilityPoolProxyAddress, borrowerOperationsAddress, troveManagerAddress],
-            values: [0, 0],
+            values: [0, 0, 0],
             signatures: ["setImplementation(address)", "setImplementation(address)", "setImplementation(address)"],
             data: [
                 ethers.AbiCoder.defaultAbiCoder().encode(
                     ["address"],
                     [newStabilityPoolImplementation]
                 ),
-                ethers.AbiCoder.defaultAbiCoder().encode(["address"], [borrowerOperationsAddress]),
-                ethers.AbiCoder.defaultAbiCoder().encode(["address"], [troveManagerAddress]),
+                ethers.AbiCoder.defaultAbiCoder().encode(["address"], [newBorrowerOperationsImplementation]),
+                ethers.AbiCoder.defaultAbiCoder().encode(["address"], [newTroveManagerImplementation]),
             ],
             // @todo update sip description
             description:
                 "SIP-SOV3564: upgrade stabilityPool, borrowerOperations, troveManager",
         },
-        governorName: "GovernorOwner",
+        governor: "GovernorOwner",
     };
 
     return args;
