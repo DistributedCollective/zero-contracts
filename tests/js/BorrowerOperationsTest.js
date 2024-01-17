@@ -10,6 +10,7 @@ const TroveManagerTester = artifacts.require("TroveManagerTester");
 const ZUSDTokenTester = artifacts.require("./ZUSDTokenTester");
 const MassetManagerTester = artifacts.require("MassetManagerTester");
 const NueMockToken = artifacts.require("NueMockToken");
+const Permit2 = artifacts.require("Permit2");
 
 const th = testHelpers.TestHelper;
 
@@ -69,6 +70,7 @@ contract("BorrowerOperations", async accounts => {
   let zeroToken;
   let massetManager;
   let nueMockToken;
+  let permit2;
 
   let contracts;
 
@@ -135,8 +137,10 @@ contract("BorrowerOperations", async accounts => {
 
   const testCorpus = ({ withProxy = false }) => {
     before(async () => {
+      permit2 = await Permit2.new();
+
       contracts = await deploymentHelper.deployLiquityCore();
-      contracts.borrowerOperations = await BorrowerOperationsTester.new();
+      contracts.borrowerOperations = await BorrowerOperationsTester.new(permit2.address);
       contracts.massetManager = await MassetManagerTester.new();
       contracts.troveManager = await TroveManagerTester.new();
       contracts = await deploymentHelper.deployZUSDTokenTester(contracts);

@@ -15,12 +15,14 @@ import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
 import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
+import "./Permit2Handler.sol";
 
 contract BorrowerOperations is
     LiquityBase,
     BorrowerOperationsStorage,
     CheckContract,
-    IBorrowerOperations
+    IBorrowerOperations,
+    Permit2Handler
 {
     /* --- Variable container structs  ---
 
@@ -90,6 +92,9 @@ contract BorrowerOperations is
         BorrowerOperation operation
     );
     event ZUSDBorrowingFeePaid(address indexed _borrower, uint256 _ZUSDFee);
+
+    /** Constructor */
+    constructor(address _permit2) public Permit2Handler(_permit2) {}
 
     // --- Dependency setters ---
 
@@ -414,7 +419,9 @@ contract BorrowerOperations is
                 massetManager,
                 _ZUSDChange,
                 address(zusdToken),
-                _permitParams
+                _permitParams,
+                _useNonce(msg.sender),
+                permit2
             );
         }
         _adjustSenderTrove(
@@ -621,7 +628,9 @@ contract BorrowerOperations is
             massetManager,
             debt.sub(ZUSD_GAS_COMPENSATION),
             address(zusdToken),
-            _permitParams
+            _permitParams,
+            _useNonce(msg.sender),
+            permit2
         );
         _closeTrove();
     }

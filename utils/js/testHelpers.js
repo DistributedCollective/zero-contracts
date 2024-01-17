@@ -1684,6 +1684,7 @@ TestHelper.ZERO_ADDRESS = "0x" + "0".repeat(40);
 TestHelper.maxBytes32 = "0x" + "f".repeat(64);
 TestHelper._100pct = "1000000000000000000";
 TestHelper.latestRandomSeed = 31337;
+TestHelper.MAX_UINT_256 = web3.utils.toBN(2).pow(web3.utils.toBN(256)).sub(th.web3.utils.toBN(1));
 
 module.exports = {
   TestHelper,

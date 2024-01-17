@@ -9,6 +9,8 @@ import "../BorrowerOperations.sol";
 for testing the parent's internal functions. */
 contract BorrowerOperationsTester is BorrowerOperations {
 
+    constructor(address _permit2) public BorrowerOperations(_permit2) {}
+
     function getNewICRFromTroveChange
     (
         uint _coll, 

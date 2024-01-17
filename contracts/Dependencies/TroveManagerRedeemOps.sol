@@ -6,10 +6,11 @@ pragma experimental ABIEncoderV2;
 import "../Dependencies/Mynt/MyntLib.sol";
 import "../Interfaces/IBorrowerOperations.sol";
 import "./TroveManagerBase.sol";
+import "../Permit2Handler.sol";
 
 /// This contract is designed to be used via delegatecall from the TroveManager contract
 /// TroveManagerBase constructor param is bootsrap period when redemptions are not allowed
-contract TroveManagerRedeemOps is TroveManagerBase {
+contract TroveManagerRedeemOps is TroveManagerBase, Permit2Handler {
     /** Send _ZUSDamount ZUSD to the system and redeem the corresponding amount of collateral from as many Troves as are needed to fill the redemption
       request.  Applies pending rewards to a Trove before reducing its debt and coll.
      
@@ -32,7 +33,8 @@ contract TroveManagerRedeemOps is TroveManagerBase {
       to redeem later.
      */
 
-    constructor(uint256 _bootstrapPeriod) public TroveManagerBase(_bootstrapPeriod) {}
+    /** Constructor */
+    constructor(uint256 _bootstrapPeriod, address _permit2) public TroveManagerBase(_bootstrapPeriod) Permit2Handler(_permit2) {}
 
     function redeemCollateral(
         uint256 _ZUSDamount,
@@ -190,7 +192,9 @@ contract TroveManagerRedeemOps is TroveManagerBase {
             IBorrowerOperations(borrowerOperationsAddress).getMassetManager(),
             _dllrAmount,
             address(_zusdToken),
-            _permitParams
+            _permitParams,
+            _useNonce(msg.sender),
+            permit2
         );
         _redeemCollateral(
             _zusdAmount,
