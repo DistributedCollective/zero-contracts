@@ -2,6 +2,7 @@ const StabilityPool = artifacts.require("./StabilityPool.sol");
 const ActivePool = artifacts.require("./ActivePool.sol");
 const DefaultPool = artifacts.require("./DefaultPool.sol");
 const NonPayable = artifacts.require("./NonPayable.sol");
+const Permit2 = artifacts.require("Permit2");
 
 const testHelpers = require("../../utils/js/testHelpers.js");
 const timeMachine = require('ganache-time-traveler');
@@ -16,11 +17,13 @@ contract('StabilityPool', async accounts => {
   TODO: Replace with mock contracts, and later complete transactions from EOA
   */
   let stabilityPool;
+  let permit2;
 
   const [owner, alice] = accounts;
 
   before(async () => {
-    stabilityPool = await StabilityPool.new();
+    permit2 = await Permit2.new();
+    stabilityPool = await StabilityPool.new(permit2.address);
     const mockActivePoolAddress = (await NonPayable.new()).address;
     const dumbContractAddress = (await NonPayable.new()).address;
     await stabilityPool.setAddresses(dumbContractAddress, dumbContractAddress, dumbContractAddress, mockActivePoolAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress, dumbContractAddress);

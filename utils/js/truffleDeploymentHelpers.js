@@ -8,16 +8,18 @@ const DefaultPool = artifacts.require("./DefaultPool.sol");
 const StabilityPool = artifacts.require("./StabilityPool.sol")
 const FunctionCaller = artifacts.require("./FunctionCaller.sol")
 const BorrowerOperations = artifacts.require("./BorrowerOperations.sol")
+const Permit2 = artifacts.require("Permit2");
 
 const deployLiquity = async () => {
+  const permit2 = await Permit2.new();
   const priceFeedTestnet = await PriceFeedTestnet.new()
   const sortedTroves = await SortedTroves.new()
-  const troveManager = await TroveManager.new()
+  const troveManager = await TroveManager.new(permit2.address)
   const activePool = await ActivePool.new()
-  const stabilityPool = await StabilityPool.new()
+  const stabilityPool = await StabilityPool.new(permit2.address)
   const defaultPool = await DefaultPool.new()
   const functionCaller = await FunctionCaller.new()
-  const borrowerOperations = await BorrowerOperations.new()
+  const borrowerOperations = await BorrowerOperations.new(permit2.address)
   const zusdToken = await ZUSDToken.new()
   await zusdToken.initialize(
     troveManager.address,

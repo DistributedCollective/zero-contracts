@@ -40,7 +40,7 @@ contract(
 
     before(async () => {
       coreContracts = await deploymentHelper.deployLiquityCore();
-      coreContracts.troveManager = await TroveManagerTester.new();
+      coreContracts.troveManager = await TroveManagerTester.new(coreContracts.permit2.address);
       coreContracts = await deploymentHelper.deployZUSDTokenTester(coreContracts);
       const ZEROContracts = await deploymentHelper.deployZEROTesterContractsHardhat(multisig);
 

@@ -65,7 +65,7 @@ contract('BorrowerWrappers', async accounts => {
 
   before(async () => {
     contracts = await deploymentHelper.deployLiquityCore();
-    contracts.troveManager = await TroveManagerTester.new();
+    contracts.troveManager = await TroveManagerTester.new(contracts.permit2.address);
     contracts = await deploymentHelper.deployZUSDToken(contracts);
     const ZEROContracts = await deploymentHelper.deployZEROTesterContractsHardhat(multisig);
 

@@ -74,6 +74,7 @@
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",
     "@types/mocha": "^10.0.1",
+    "@uniswap/permit2-sdk": "^1.2.0",
     "chai": "^4.3.8",
     "chai-bn": "0.2.2",
     "dotenv": "^16.0.3",

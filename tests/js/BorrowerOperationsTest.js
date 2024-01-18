@@ -10,7 +10,7 @@ const TroveManagerTester = artifacts.require("TroveManagerTester");
 const ZUSDTokenTester = artifacts.require("./ZUSDTokenTester");
 const MassetManagerTester = artifacts.require("MassetManagerTester");
 const NueMockToken = artifacts.require("NueMockToken");
-const Permit2 = artifacts.require("Permit2");
+const { AllowanceProvider, PermitTransferFrom, SignatureTransfer } = require("@uniswap/permit2-sdk");
 
 const th = testHelpers.TestHelper;
 
@@ -21,6 +21,7 @@ const timeValues = testHelpers.TimeValues;
 
 const ZERO_ADDRESS = th.ZERO_ADDRESS;
 const assertRevert = th.assertRevert;
+
 
 /* NOTE: Some of the borrowing tests do not test for specific ZUSD fee values. They only test that the
  * fees are non-zero when they should occur, and that they decay over time.
@@ -137,12 +138,12 @@ contract("BorrowerOperations", async accounts => {
 
   const testCorpus = ({ withProxy = false }) => {
     before(async () => {
-      permit2 = await Permit2.new();
-
       contracts = await deploymentHelper.deployLiquityCore();
+      permit2 = contracts.permit2;
+
       contracts.borrowerOperations = await BorrowerOperationsTester.new(permit2.address);
       contracts.massetManager = await MassetManagerTester.new();
-      contracts.troveManager = await TroveManagerTester.new();
+      contracts.troveManager = await TroveManagerTester.new(permit2.address);
       contracts = await deploymentHelper.deployZUSDTokenTester(contracts);
       const ZEROContracts = await deploymentHelper.deployZEROTesterContractsHardhat(multisig);
 
@@ -2073,8 +2074,34 @@ contract("BorrowerOperations", async accounts => {
       const decreaseAmount = toBN(dec(50, 16));
 
       // Alice adjusts trove coll and debt decrease (-0.5 ETH, -50ZUSD)
-      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, borrowerOperations.address, decreaseAmount.toString());
-      await th.repayZusdFromDLLR(alice, contracts, decreaseAmount, permission);
+      await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: alice });
+      const nonce = await borrowerOperations.nonces(alice_signer.address);
+      const deadline = th.toDeadline(1000 * 60 * 60 * 30 /** 30 minutes */);
+      const permitTransferFrom = {
+        permitted: {
+            token: nueMockToken.address,
+            amount: decreaseAmount.toString(),
+        },
+        spender: borrowerOperations.address.toLowerCase(),
+        nonce: nonce.toString(),
+        deadline: deadline
+      }
+      const network = await ethers.provider.getNetwork();
+      const chainId = network.chainId;
+
+      const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
+
+      const signature = await alice_signer.signTypedData(domain, types, values);
+
+      const {v, r, s} = th.extractSignature(signature);
+
+      const permitParams = {
+          deadline: deadline,
+          v: v,
+          r: r,
+          s: s
+      }
+      await th.repayZusdFromDLLR(alice, contracts, decreaseAmount, permitParams);
 
       const debtAfter = await getTroveEntireDebt(alice);
       const collAfter = await getTroveEntireColl(alice);
@@ -3508,7 +3535,34 @@ contract("BorrowerOperations", async accounts => {
 
       const decreaseAmount = toBN(dec(50, 16));
       // Alice adjusts trove coll and debt decrease (-0.5 ETH, -50ZUSD)
-      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, borrowerOperations.address, decreaseAmount.toString());
+      await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: alice });
+      const nonce = await borrowerOperations.nonces(alice_signer.address);
+      const deadline = th.toDeadline(1000 * 60 * 60 * 30 /** 30 minutes */);
+      const permitTransferFrom = {
+        permitted: {
+            token: nueMockToken.address,
+            amount: decreaseAmount.toString(),
+        },
+        spender: borrowerOperations.address.toLowerCase(),
+        nonce: nonce.toString(),
+        deadline: deadline
+      }
+      const network = await ethers.provider.getNetwork();
+      const chainId = network.chainId;
+
+      const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
+
+      const signature = await alice_signer.signTypedData(domain, types, values);
+
+      const {v, r, s} = th.extractSignature(signature);
+
+      const permitParams = {
+          deadline: deadline,
+          v: v,
+          r: r,
+          s: s
+      }
+      
       await borrowerOperations.adjustNueTrove(
         th._100pct,
         dec(500, "finney"),
@@ -3516,7 +3570,7 @@ contract("BorrowerOperations", async accounts => {
         false,
         alice,
         alice,
-        permission,
+        permitParams,
         { from: alice }
       );
 
@@ -4248,8 +4302,36 @@ contract("BorrowerOperations", async accounts => {
 
       // Alice attempts to close trove
       const value = (await troveManager.getTroveDebt(alice)).sub(await borrowerOperations.ZUSD_GAS_COMPENSATION());
-      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, borrowerOperations.address, value.toString());
-      await borrowerOperations.closeNueTrove(permission, { from: alice });
+
+      await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: alice });
+      const nonce = await borrowerOperations.nonces(alice_signer.address);
+      const deadline = th.toDeadline(1000 * 60 * 60 * 30 /** 30 minutes */);
+      const permitTransferFrom = {
+        permitted: {
+            token: nueMockToken.address,
+            amount: value.toString(),
+        },
+        spender: borrowerOperations.address.toLowerCase(),
+        nonce: nonce.toString(),
+        deadline: deadline
+      }
+      const network = await ethers.provider.getNetwork();
+      const chainId = network.chainId;
+
+      const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
+
+      const signature = await alice_signer.signTypedData(domain, types, values);
+
+      const {v, r, s} = th.extractSignature(signature);
+
+      const permitParams = {
+          deadline: deadline,
+          v: v,
+          r: r,
+          s: s
+      }
+
+      await borrowerOperations.closeNueTrove(permitParams, { from: alice });
 
       const aliceCollAfter = await getTroveEntireColl(alice);
       assert.equal(aliceCollAfter, "0");

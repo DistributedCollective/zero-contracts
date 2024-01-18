@@ -54,7 +54,7 @@ contract EchidnaTester {
     constructor(address _permit2) public payable {
         liquityBaseParams = new LiquityBaseParams();
         troveManagerRedeemOps = new TroveManagerRedeemOps(14 * 86400, _permit2);
-        troveManager = new TroveManager(14 days);
+        troveManager = new TroveManager(14 days, _permit2);
         borrowerOperations = new BorrowerOperations(_permit2);
         activePool = new ActivePool();
         defaultPool = new DefaultPool();

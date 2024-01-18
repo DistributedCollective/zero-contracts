@@ -50,7 +50,7 @@ describe.skip("There are no longer fees being shared to ZeroStaking", function (
 
     before(async () => {
       contracts = await deploymentHelper.deployLiquityCore();
-      contracts.troveManager = await TroveManagerTester.new();
+      contracts.troveManager = await TroveManagerTester.new(contracts.permit2.address);
       contracts = await deploymentHelper.deployZUSDTokenTester(contracts);
       const ZEROContracts = await deploymentHelper.deployZEROTesterContractsHardhat(multisig);
 

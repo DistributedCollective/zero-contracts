@@ -1,4 +1,5 @@
 const deploymentHelper = require("../../utils/js/deploymentHelpers.js");
+const { AllowanceProvider, PermitTransferFrom, SignatureTransfer } = require("@uniswap/permit2-sdk");
 const testHelpers = require("../../utils/js/testHelpers.js");
 const timeMachine = require('ganache-time-traveler');
 const { signERC2612Permit } = require('eth-permit');
@@ -49,6 +50,7 @@ contract('TroveManager', async accounts => {
   let hintHelpers;
   let massetManager;
   let nueMockToken;
+  let permit2;
 
   let dennis_signer;
 
@@ -64,7 +66,8 @@ contract('TroveManager', async accounts => {
 
   before(async () => {
     contracts = await deploymentHelper.deployLiquityCore();
-    contracts.troveManager = await TroveManagerTester.new();
+    permit2 = contracts.permit2;
+    contracts.troveManager = await TroveManagerTester.new(permit2.address);
     contracts.zusdToken = await ZUSDTokenTester.new(
       contracts.troveManager.address,
       contracts.stabilityPool.address,
@@ -2371,6 +2374,9 @@ contract('TroveManager', async accounts => {
     const partialRedemptionAmount = toBN(2);
     const redemptionAmount = C_netDebt.add(B_netDebt).add(partialRedemptionAmount);
 
+    /** Approve Permit2 with unlimited amount */
+    await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: dennis });
+
     // start Dennis with a high ICR
     await openNueTrove({ ICR: toBN(dec(100, 18)), extraZUSDAmount: redemptionAmount, extraParams: { from: dennis } });
 
@@ -2401,8 +2407,31 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
-    // get ERC2612 permission from alice for stability pool to spend DLLR amount
-    const permission = await signERC2612Permit(dennis_signer, nueMockToken.address, dennis_signer.address, troveManager.address, redemptionAmount.toString());
+    const nonce = await troveManager.nonces(dennis_signer.address);
+    const deadline = th.toDeadline(1000 * 60 * 60 * 60 * 24 * 28 );
+    const permitTransferFrom = {
+      permitted: {
+          token: nueMockToken.address,
+          amount: redemptionAmount.toString(),
+      },
+      spender: troveManager.address.toLowerCase(),
+      nonce: nonce.toString(),
+      deadline: deadline
+    }
+    const network = await ethers.provider.getNetwork();
+    const chainId = network.chainId;
+
+    const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
+
+    const signature = await dennis_signer.signTypedData(domain, types, values);
+    const {v, r, s} = th.extractSignature(signature);
+
+    const permitParams = {
+        deadline: deadline,
+        v: v,
+        r: r,
+        s: s
+    }
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
@@ -2413,7 +2442,7 @@ contract('TroveManager', async accounts => {
       lowerPartialRedemptionHint,
       partialRedemptionHintNICR,
       0, th._100pct,
-      permission,
+      permitParams,
       {
         from: dennis,
         gasPrice: 0

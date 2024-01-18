@@ -56,7 +56,7 @@ contract('ZERO community issuance arithmetic tests', async accounts => {
   before(async () => {
     contracts = await deploymentHelper.deployLiquityCore();
     const ZEROContracts = await deploymentHelper.deployZEROTesterContractsHardhat(multisig);
-    contracts.stabilityPool = await StabilityPool.new();
+    contracts.stabilityPool = await StabilityPool.new(contracts.permit2.address);
     contracts = await deploymentHelper.deployZUSDToken(contracts);
 
     stabilityPool = contracts.stabilityPool;

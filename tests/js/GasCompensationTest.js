@@ -41,13 +41,10 @@ contract('Gas compensation tests', async accounts => {
   };
 
   before(async () => {
-    //troveManager = await TroveManagerTester.new()
-    borrowerOperationsTester = await BorrowerOperationsTester.new();
-
-    //TroveManagerTester.setAsDeployed(troveManager)
     BorrowerOperationsTester.setAsDeployed(borrowerOperationsTester);
     contracts = await deploymentHelper.deployLiquityCore();
-    contracts.troveManager = await TroveManagerTester.new();
+    borrowerOperationsTester = await BorrowerOperationsTester.new(contracts.permit2.address);
+    contracts.troveManager = await TroveManagerTester.new(contracts.permit2.address);
     contracts.zusdToken = await ZUSDToken.new();
     await contracts.zusdToken.initialize(
       contracts.troveManager.address,

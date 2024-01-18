@@ -3,6 +3,7 @@ const deploymentHelper = require("../../utils/js/deploymentHelpers.js");
 const testHelpers = require("../../utils/js/testHelpers.js");
 const TroveManagerTester = artifacts.require("./TroveManagerTester.sol");
 const LiquityMathTester = artifacts.require("./LiquityMathTester.sol");
+const Permit2 = artifacts.require("Permit2");
 
 const th = testHelpers.TestHelper;
 
@@ -17,7 +18,8 @@ contract("Gas costs for math functions", async accounts => {
   let mathTester;
 
   before(async () => {
-    troveManagerTester = await TroveManagerTester.new();
+    const permit2 = await Permit2.new();
+    troveManagerTester = await TroveManagerTester.new(permit2.address);
     TroveManagerTester.setAsDeployed(troveManagerTester);
 
     mathTester = await LiquityMathTester.new();

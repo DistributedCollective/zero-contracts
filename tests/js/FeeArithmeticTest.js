@@ -333,12 +333,12 @@ contract('Fee arithmetic tests', async accounts => {
   ];
 
   before(async () => {
-    troveManagerTester = await TroveManagerTester.new();
-    TroveManagerTester.setAsDeployed(troveManagerTester);
-
     mathTester = await LiquityMathTester.new();
     LiquityMathTester.setAsDeployed(mathTester);
     contracts = await deploymentHelper.deployLiquityCore();
+
+    troveManagerTester = await TroveManagerTester.new(contracts.permit2.address);
+    TroveManagerTester.setAsDeployed(troveManagerTester);
     const ZEROContracts = await deploymentHelper.deployZEROContracts(multisig);
 
     await deploymentHelper.connectZEROContracts(ZEROContracts);

@@ -62,7 +62,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
     before(async () => {
       contracts = await deploymentHelper.deployLiquityCore();
       const ZEROContracts = await deploymentHelper.deployZEROContracts(multisig);
-      contracts.troveManager = await TroveManagerTester.new();
+      contracts.troveManager = await TroveManagerTester.new(contracts.permit2.address);
       contracts = await deploymentHelper.deployZUSDToken(contracts);
 
       priceFeed = contracts.priceFeedTestnet;

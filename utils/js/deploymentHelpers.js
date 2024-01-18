@@ -44,6 +44,7 @@ const TroveManagerScript = artifacts.require("TroveManagerScript");
 const StabilityPoolScript = artifacts.require("StabilityPoolScript");
 const TokenScript = artifacts.require("TokenScript");
 const ZEROStakingScript = artifacts.require("ZEROStakingScript");
+const Permit2 = artifacts.require("Permit2");
 
 const {
   buildUserProxies,
@@ -99,19 +100,20 @@ class DeploymentHelper {
   }
 
   static async deployLiquityCoreHardhat() {
+    const permit2 = await Permit2.new();
     const priceFeedTestnet = await PriceFeedTestnet.new();
     const priceFeedSovryn = await PriceFeedSovryn.new();
     const sortedTroves = await SortedTroves.new();
     const liquityBaseParams = await LiquityBaseParams.new();
-    const troveManagerRedeemOps = await TroveManagerRedeemOps.new(TWO_WEEKS);
-    const troveManager = await TroveManager.new(TWO_WEEKS);
+    const troveManagerRedeemOps = await TroveManagerRedeemOps.new(TWO_WEEKS, permit2.address);
+    const troveManager = await TroveManager.new(TWO_WEEKS, permit2.address);
     const activePool = await ActivePool.new();
-    const stabilityPool = await StabilityPool.new();
+    const stabilityPool = await StabilityPool.new(permit2.address);
     const gasPool = await GasPool.new();
     const defaultPool = await DefaultPool.new();
     const collSurplusPool = await CollSurplusPool.new();
     const functionCaller = await FunctionCaller.new();
-    const borrowerOperations = await BorrowerOperations.new();
+    const borrowerOperations = await BorrowerOperations.new(permit2.address);
     const hintHelpers = await HintHelpers.new();
     const zusdToken = await ZUSDToken.new();
     const feeDistributor = await FeeDistributor.new();
@@ -139,6 +141,7 @@ class DeploymentHelper {
     HintHelpers.setAsDeployed(hintHelpers);
     FeeDistributor.setAsDeployed(feeDistributor);
     WRBTCTokenTester.setAsDeployed(wrbtcTokenTester);
+    Permit2.setAsDeployed(permit2);
 
     const coreContracts = {
       priceFeedTestnet,
@@ -157,7 +160,8 @@ class DeploymentHelper {
       borrowerOperations,
       hintHelpers,
       feeDistributor,
-      wrbtcTokenTester
+      wrbtcTokenTester,
+      permit2
     };
     return coreContracts;
   }
@@ -166,6 +170,7 @@ class DeploymentHelper {
     const testerContracts = {};
 
     // Contract without testers (yet)
+    testerContracts.permit2 = await Permit2.new();
     testerContracts.liquityBaseParams = await LiquityBaseParams.new();
     testerContracts.priceFeedTestnet = await PriceFeedTestnet.new();
     testerContracts.priceFeedSovryn = await PriceFeedSovryn.new();
@@ -174,13 +179,13 @@ class DeploymentHelper {
     testerContracts.communityIssuance = await CommunityIssuanceTester.new();
     testerContracts.activePool = await ActivePoolTester.new();
     testerContracts.defaultPool = await DefaultPoolTester.new();
-    testerContracts.stabilityPool = await StabilityPoolTester.new();
+    testerContracts.stabilityPool = await StabilityPoolTester.new(testerContracts.permit2.address);
     testerContracts.gasPool = await GasPool.new();
     testerContracts.collSurplusPool = await CollSurplusPool.new();
     testerContracts.math = await LiquityMathTester.new();
-    testerContracts.borrowerOperations = await BorrowerOperationsTester.new();
-    testerContracts.troveManagerRedeemOps = await TroveManagerRedeemOps.new(TWO_WEEKS);
-    testerContracts.troveManager = await TroveManagerTester.new(TWO_WEEKS);
+    testerContracts.borrowerOperations = await BorrowerOperationsTester.new(testerContracts.permit2.address);
+    testerContracts.troveManagerRedeemOps = await TroveManagerRedeemOps.new(TWO_WEEKS, testerContracts.permit2.address);
+    testerContracts.troveManager = await TroveManagerTester.new(testerContracts.permit2.address);
     testerContracts.functionCaller = await FunctionCaller.new();
     testerContracts.hintHelpers = await HintHelpers.new();
     testerContracts.zusdToken = await ZUSDTokenTester.new(
@@ -260,19 +265,20 @@ class DeploymentHelper {
   }
 
   static async deployLiquityCoreTruffle() {
+    const permit2 = await Permit2.new();
     const priceFeedTestnet = await PriceFeedTestnet.new();
     const priceFeedSovryn = await PriceFeedSovryn.new();
     const sortedTroves = await SortedTroves.new();
     const liquityBaseParams = await LiquityBaseParams.new();
-    const troveManagerRedeemOps = await TroveManagerRedeemOps.new(TWO_WEEKS);
+    const troveManagerRedeemOps = await TroveManagerRedeemOps.new(TWO_WEEKS, permit2.address);
     const troveManager = await TroveManager.new(TWO_WEEKS);
     const activePool = await ActivePool.new();
-    const stabilityPool = await StabilityPool.new();
+    const stabilityPool = await StabilityPool.new(permit2.address);
     const gasPool = await GasPool.new();
     const defaultPool = await DefaultPool.new();
     const collSurplusPool = await CollSurplusPool.new();
     const functionCaller = await FunctionCaller.new();
-    const borrowerOperations = await BorrowerOperations.new();
+    const borrowerOperations = await BorrowerOperations.new(permit2.address);
     const hintHelpers = await HintHelpers.new();
     const zusdToken = await ZUSDToken.new();
     const feeDistributor = await FeeDistributor.new();

@@ -16,8 +16,9 @@ import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
 import "./Dependencies/TroveManagerBase.sol";
 import "./TroveManagerStorage.sol";
+import "./Permit2Handler.sol";
 
-contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
+contract TroveManager is TroveManagerBase, CheckContract, ITroveManager, Permit2Handler {
     event FeeDistributorAddressChanged(address _feeDistributorAddress);
     event TroveManagerRedeemOpsAddressChanged(address _troveManagerRedeemOps);
     event LiquityBaseParamsAddressChanges(address _borrowerOperationsAddress);
@@ -34,7 +35,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     event ZEROStakingAddressChanged(address _zeroStakingAddress);
 
     ///@param _bootstrapPeriod During bootsrap period redemptions are not allowed
-    constructor(uint256 _bootstrapPeriod) public TroveManagerBase(_bootstrapPeriod) {}
+    constructor(uint256 _bootstrapPeriod, address _permit2) public TroveManagerBase(_bootstrapPeriod) Permit2Handler(_permit2) {}
 
     // --- Dependency setter ---
     function setAddresses(

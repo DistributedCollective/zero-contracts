@@ -59,7 +59,7 @@ contract('StabilityPool - Withdrawal of stability deposit - Reward calculations'
       gasPriceInWei = await web3.eth.getGasPrice();
       contracts = await deploymentHelper.deployLiquityCore();
       const ZEROContracts = await deploymentHelper.deployZEROContracts(multisig);
-      contracts.troveManager = await TroveManagerTester.new();
+      contracts.troveManager = await TroveManagerTester.new(contracts.permit2.address);
       contracts = await deploymentHelper.deployZUSDToken(contracts);
 
       priceFeed = contracts.priceFeedTestnet;

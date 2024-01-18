@@ -51,7 +51,7 @@ contract('TroveManager', async accounts => {
 
   before(async () => {
     contracts = await deploymentHelper.deployLiquityCore();
-    contracts.troveManager = await TroveManagerTester.new();
+    contracts.troveManager = await TroveManagerTester.new(contracts.permit2.address);
     contracts.zusdToken = await ZUSDTokenTester.new(
       contracts.troveManager.address,
       contracts.stabilityPool.address,

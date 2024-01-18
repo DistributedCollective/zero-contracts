@@ -1,4 +1,5 @@
 const deploymentHelper = require("../../utils/js/deploymentHelpers.js");
+const { AllowanceProvider, PermitTransferFrom, SignatureTransfer } = require("@uniswap/permit2-sdk");
 const testHelpers = require("../../utils/js/testHelpers.js");
 const th = testHelpers.TestHelper;
 const dec = th.dec;
@@ -57,6 +58,7 @@ contract('StabilityPool', async accounts => {
   let communityIssuance;
   let massetManager;
   let nueMockToken;
+  let permit2;
 
   let gasPriceInWei;
 
@@ -73,8 +75,9 @@ contract('StabilityPool', async accounts => {
       alice_signer = (await ethers.getSigners())[5];
 
       contracts = await deploymentHelper.deployLiquityCore();
-      contracts.troveManager = await TroveManagerTester.new();
-      contracts.borrowerOperations = await BorrowerOperationsTester.new();
+      permit2 = contracts.permit2;
+      contracts.troveManager = await TroveManagerTester.new(permit2.address);
+      contracts.borrowerOperations = await BorrowerOperationsTester.new(permit2.address);
       contracts.zusdToken = await ZUSDToken.new();
       await contracts.zusdToken.initialize(
         contracts.troveManager.address,
@@ -138,7 +141,33 @@ contract('StabilityPool', async accounts => {
       // open a trove to get ZUSD and deposit ZUSD to Mynt to get DLLR
       await openNueTrove({ extraZUSDAmount: spAmount, ICR: toBN(dec(2, 18)), extraParams: { from: alice } });
       // get ERC2612 permission from alice for stability pool to spend DLLR amount
-      const permission = await signERC2612Permit(alice_signer, nueMockToken.address, alice_signer.address, stabilityPool.address, spAmount.toString());
+      await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: alice });
+      const nonce = await stabilityPool.nonces(alice_signer.address);
+      const deadline = th.toDeadline(1000 * 60 * 60 * 30 /** 30 minutes */);
+      const permitTransferFrom = {
+        permitted: {
+            token: nueMockToken.address,
+            amount: spAmount.toString(),
+        },
+        spender: stabilityPool.address.toLowerCase(),
+        nonce: nonce.toString(),
+        deadline: deadline
+      }
+      const network = await ethers.provider.getNetwork();
+      const chainId = network.chainId;
+
+      const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
+
+      const signature = await alice_signer.signTypedData(domain, types, values);
+
+      const {v, r, s} = th.extractSignature(signature);
+
+      const permitParams = {
+          deadline: deadline,
+          v: v,
+          r: r,
+          s: s
+      }
 
       // --- TEST ---
       // check user's deposit record before
@@ -152,7 +181,7 @@ contract('StabilityPool', async accounts => {
       assert.equal(zusdBalance_Before, 0);
 
       // provideToSP()
-      await stabilityPool.provideToSpFromDLLR(spAmount.toString(), permission, { from: alice });
+      await stabilityPool.provideToSpFromDLLR(spAmount.toString(), permitParams, { from: alice });
 
       // check balances
       const alice_depositRecord_After = (await stabilityPool.deposits(alice))[0];
