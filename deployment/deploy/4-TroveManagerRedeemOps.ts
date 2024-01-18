@@ -4,11 +4,18 @@ const path = require("path");
 import Logs from "node-logs";
 import { TroveManager } from "types/generated";
 const logger = new Logs().showInConsole(true);
+import * as helpers from "../../scripts/helpers/helpers";
 
 const deploymentName = getContractNameFromScriptFileName(path.basename(__filename));
 
-const func: DeployFunction = async ({ ethers, getNamedAccounts, deployments, network }) => {
-    const { deploy, log } = deployments;
+const func: DeployFunction = async (hre) => {
+    const {
+        getNamedAccounts,
+        ethers,
+        deployments: { get, deploy, log, execute },
+        network
+    } = hre;
+
     const { deployer } = await getNamedAccounts();
     const troveManager: TroveManager = (await ethers.getContract(
         "TroveManager"
@@ -30,7 +37,14 @@ const func: DeployFunction = async ({ ethers, getNamedAccounts, deployments, net
         }
         if (network.tags.testnet) {
             console.log("testnet");
+            logger.information(`Initiating multisig tx to set TroveManagerRedeemOps in TroveManager....`)
             // multisig tx
+            const deployment = await get(deploymentName);
+            const { deployer } = await getNamedAccounts();
+            const multisigAddress = (await get("MultiSigWallet")).address;
+            const data = troveManager.interface.encodeFunctionData("setTroveManagerRedeemOps", [deployment.address]);
+
+            await helpers.sendWithMultisig(hre, multisigAddress, troveManager.target.toString(), data, deployer);
         } else if (network.tags.mainnet) {
             // create SIP message
             console.log("mainnet");
@@ -38,7 +52,7 @@ const func: DeployFunction = async ({ ethers, getNamedAccounts, deployments, net
         } else {
             // just replace logic directly
             console.log("else!");
-            await deployments.execute(
+            await execute(
                 "TroveManager",
                 { from: deployer },
                 "setTroveManagerRedeemOps",
