@@ -4,6 +4,7 @@ pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
 import "../Dependencies/Mynt/IMassetManager.sol";
+import { IPermit2, ISignatureTransfer } from "./IPermit2.sol";
 
 /// Common interface for the Trove Manager.
 interface IBorrowerOperations {
@@ -162,6 +163,15 @@ interface IBorrowerOperations {
         IMassetManager.PermitParams calldata _permitParams
     ) external;
 
+    /// Repay ZUSD tokens to a Trove: Burn the repaid ZUSD tokens, and reduce the trove's debt accordingly
+    function repayZusdFromDLLRWithPermit2(
+        uint256 _dllrAmount,
+        address _upperHint,
+        address _lowerHint,
+        ISignatureTransfer.PermitTransferFrom memory _permit,
+        bytes calldata _signature
+    ) external;
+
     /**
      * @notice allows a borrower to repay all debt, withdraw all their collateral, and close their Trove.
      * Requires the borrower have a ZUSD balance sufficient to repay their trove's debt, excluding gas compensation - i.e. `(debt - 50)` ZUSD.
@@ -174,6 +184,13 @@ interface IBorrowerOperations {
      * This method is identical to `closeTrove()`, but operates on NUE tokens instead of ZUSD.
      */
     function closeNueTrove(IMassetManager.PermitParams calldata _permitParams) external;
+
+    /**
+     * @notice allows a borrower to repay all debt, withdraw all their collateral, and close their Trove.
+     * Requires the borrower have a NUE balance sufficient to repay their trove's debt, excluding gas compensation - i.e. `(debt - 50)` NUE.
+     * This method is identical to `closeTrove()`, but operates on NUE tokens instead of ZUSD.
+     */
+    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom memory _permit, bytes calldata _signature) external;
 
     /**
      * @notice enables a borrower to simultaneously change both their collateral and debt, subject to all the restrictions that apply to individual increases/decreases of each quantity with the following particularity:
@@ -217,6 +234,30 @@ interface IBorrowerOperations {
         address _upperHint,
         address _lowerHint,
         IMassetManager.PermitParams calldata _permitParams
+    ) external payable;
+
+    /**
+     * @notice enables a borrower to simultaneously change both their collateral and debt, subject to all the restrictions that apply to individual increases/decreases of each quantity with the following particularity:
+     * if the adjustment reduces the collateralization ratio of the Trove, the function only executes if the resulting total collateralization ratio is above 150%.
+     * The borrower has to provide a `_maxFeePercentage` that he/she is willing to accept in case of a fee slippage, i.e. when a redemption transaction is processed first, driving up the issuance fee.
+     * The parameter is ignored if the debt is not increased with the transaction.
+     * This method is identical to `adjustTrove()`, but operates on NUE tokens instead of ZUSD.
+     * @param _maxFee max fee percentage to acept in case of a fee slippage
+     * @param _collWithdrawal collateral amount to withdraw
+     * @param _debtChange ZUSD amount to change
+     * @param isDebtIncrease indicates if increases debt
+     * @param _upperHint upper trove id hint
+     * @param _lowerHint lower trove id hint
+     */
+    function adjustNueTroveWithPermit2(
+        uint256 _maxFee,
+        uint256 _collWithdrawal,
+        uint256 _debtChange,
+        bool isDebtIncrease,
+        address _upperHint,
+        address _lowerHint,
+        ISignatureTransfer.PermitTransferFrom memory _permit,
+        bytes calldata _signature
     ) external payable;
 
     /**

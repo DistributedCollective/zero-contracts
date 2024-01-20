@@ -9,6 +9,7 @@ import "./IZUSDToken.sol";
 import "./IZEROToken.sol";
 import "./IZEROStaking.sol";
 import "../Dependencies/Mynt/IMassetManager.sol";
+import { IPermit2, ISignatureTransfer } from "./IPermit2.sol";
 
 /// Common interface for the Trove Manager.
 interface ITroveManager is ILiquityBase {
@@ -186,6 +187,19 @@ interface ITroveManager is ILiquityBase {
         uint256 _maxFeePercentage,
         IMassetManager.PermitParams calldata _permitParams
     ) external;
+
+    function redeemCollateralViaDLLRWithPermit2(
+        uint256 _dllrAmount,
+        address _firstRedemptionHint,
+        address _upperPartialRedemptionHint,
+        address _lowerPartialRedemptionHint,
+        uint256 _partialRedemptionHintNICR,
+        uint256 _maxIterations,
+        uint256 _maxFeePercentage,
+        ISignatureTransfer.PermitTransferFrom memory _permit,
+        bytes calldata _signature
+    ) external;
+    
 
     /// @notice Update borrower's stake based on their latest collateral value
     /// @param _borrower borrower address

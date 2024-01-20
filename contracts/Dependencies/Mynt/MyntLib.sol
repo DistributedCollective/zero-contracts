@@ -16,35 +16,32 @@ library MyntLib {
      *
      * @param _myntMassetManager Mynt protocol MassetManager contract address - needed for integration
      * @param _dllrAmount The amount of the DLLR (mAsset) token that will be burned in exchange for _toToken
-     * @param _toToken bAsset token address to wothdraw from DLLR
+     * @param _toToken bAsset token address to withdraw from DLLR
      * @param _permitParams EIP-2612 permit params:
      *        _deadline Expiration time of the signature.
      *        _v Last 1 byte of ECDSA signature.
      *        _r First 32 bytes of ECDSA signature.
      *        _s 32 bytes after _r in ECDSA signature.
-     * @param _nonce nonce
-     * @param _permit2 permit2 contract interface
      * @return redeemed ZUSD amount
      */
     function redeemZusdFromDllrWithPermit(
         IMassetManager _myntMassetManager,
         uint256 _dllrAmount,
         address _toToken,
-        IMassetManager.PermitParams calldata _permitParams,
-        uint256 _nonce,
-        IPermit2 _permit2
+        IMassetManager.PermitParams calldata _permitParams
     ) internal returns (uint256) {
         IDLLR dllr = IDLLR(_myntMassetManager.getToken());
         uint256 thisBalanceBefore = dllr.balanceOf(address(this));
         address thisAddress = address(this);
-
-        _permit2.permitTransferFrom(
-            _generateERC20PermitTransfer(address(dllr), _dllrAmount, _permitParams.deadline, _nonce),
-            _generateTransferDetails(thisAddress, _dllrAmount),
+        dllr.transferWithPermit(
             msg.sender,
-            _generatePermit2Signature(_permitParams.v, _permitParams.r, _permitParams.s)
+            thisAddress,
+            _dllrAmount,
+            _permitParams.deadline,
+            _permitParams.v,
+            _permitParams.r,
+            _permitParams.s
         );
-
         require(
             dllr.balanceOf(thisAddress).sub(thisBalanceBefore) == _dllrAmount,
             "DLLR transferred amount validation failed"
@@ -53,25 +50,40 @@ library MyntLib {
     }
 
     /**
-     * @dev view function to construct PermiTransferFrom struct to be used by Permit2
+     * @notice Convert DLLR _dllrAmount to _toToken utilizing EIP-2612 permit
+     * to reduce the additional sending transaction for doing the approval to the spender.
      *
-     * @param _amount amount of transfer
-     * @param _deadline signature deadline
-     * @param _nonce nonce
-     *
-     * @return PermitTransferFrom struct object 
+     * @param _myntMassetManager Mynt protocol MassetManager contract address - needed for integration
+     * @param _toToken bAsset token address to withdraw from DLLR
+     * @param _permit permit data, in form of PermitTransferFrom struct.
+     * @param _permit2 permit2 contract address
+     * @param _signature signatue of the permit data.
+     * @return redeemed ZUSD amount
      */
-    function _generateERC20PermitTransfer(address _token, uint256 _amount, uint256 _deadline, uint256 _nonce) private view returns (ISignatureTransfer.PermitTransferFrom memory) {
-        ISignatureTransfer.PermitTransferFrom memory permit = ISignatureTransfer.PermitTransferFrom({
-            permitted: ISignatureTransfer.TokenPermissions({
-                token: _token, 
-                amount: _amount
-            }),
-            nonce: _nonce,
-            deadline: _deadline
-        });
+    function redeemZusdFromDllrWithPermit2(
+        IMassetManager _myntMassetManager,
+        address _toToken,
+        ISignatureTransfer.PermitTransferFrom memory _permit,
+        IPermit2 _permit2,
+        bytes calldata _signature
+    ) internal returns (uint256) {
+        IDLLR dllr = IDLLR(_myntMassetManager.getToken());
+        uint256 thisBalanceBefore = dllr.balanceOf(address(this));
+        address thisAddress = address(this);
+        uint256 _dllrAmount = _permit.permitted.amount;
 
-        return permit;
+        _permit2.permitTransferFrom(
+            _permit,
+            _generateTransferDetails(thisAddress, _dllrAmount),
+            msg.sender,
+            _signature
+        );
+
+        require(
+            dllr.balanceOf(thisAddress).sub(thisBalanceBefore) == _dllrAmount,
+            "DLLR transferred amount validation failed"
+        );
+        return _myntMassetManager.redeemTo(_toToken, _dllrAmount, msg.sender);
     }
 
     /**

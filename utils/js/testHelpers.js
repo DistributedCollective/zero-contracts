@@ -1331,6 +1331,23 @@ class TestHelper {
   // ----------------- repayZusdFromDLLR ------------------ //
 
 
+  static async repayZusdFromDLLRWithPermit2(account, contracts, amount, permitTransferFrom, signature) {
+    const { newColl, newDebt } = await this.getCollAndDebtFromRepayZUSD(
+      contracts,
+      account,
+      amount
+    );
+    const { upperHint, lowerHint } = await this.getBorrowerOpsListHint(
+      contracts,
+      newColl,
+      newDebt
+    );
+
+    return await contracts.borrowerOperations.repayZusdFromDLLRWithPermit2(amount.toString(), upperHint, lowerHint, permitTransferFrom, signature, {
+      from: account
+    });
+  }
+
   static async repayZusdFromDLLR(account, contracts, amount, permission) {
     const { newColl, newDebt } = await this.getCollAndDebtFromRepayZUSD(
       contracts,
