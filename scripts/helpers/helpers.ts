@@ -392,10 +392,8 @@ const deployWithCustomProxy = async (
             implementation: tx.address,
         });
         if ((hre.network.tags["testnet"] || isOwnerMultisig) && !isNewProxy) {
-            console.log("asd1");
             //multisig is the owner
             const multisigDeployment = await get(multisigName);
-            console.log("asd");
             //@todo wrap getting ms tx data into a helper
             let proxyInterface = new ethers.Interface(proxyDeployment.abi);
             let data = proxyInterface.encodeFunctionData("setImplementation", [tx.address]);
