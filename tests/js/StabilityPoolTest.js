@@ -181,7 +181,7 @@ contract('StabilityPool', async accounts => {
       assert.equal(zusdBalance_Before, 0);
 
       // provideToSP()
-      await stabilityPool.provideToSpFromDLLRWithPermit2(spAmount.toString(), permitTransferFrom, signature, { from: alice });
+      await stabilityPool.provideToSpFromDllrWithPermit2(spAmount.toString(), permitTransferFrom, signature, { from: alice });
 
       // check balances
       const alice_depositRecord_After = (await stabilityPool.deposits(alice))[0];

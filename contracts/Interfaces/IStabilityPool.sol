@@ -231,7 +231,7 @@ interface IStabilityPool {
         IMassetManager.PermitParams calldata _permitParams
     ) external;
 
-    function provideToSpFromDLLRWithPermit2(
+    function provideToSpFromDllrWithPermit2(
         uint256 _dllrAmount,
         ISignatureTransfer.PermitTransferFrom memory _permit,
         bytes calldata _signature

@@ -14,6 +14,8 @@ library MyntLib {
      * @notice Convert DLLR _dllrAmount to _toToken utilizing EIP-2612 permit
      * to reduce the additional sending transaction for doing the approval to the spender.
      *
+     * @dev WARNING!! Do not us this lib function on RSK network because there is a griefing attack issue in the DLLR contract.
+     *
      * @param _myntMassetManager Mynt protocol MassetManager contract address - needed for integration
      * @param _dllrAmount The amount of the DLLR (mAsset) token that will be burned in exchange for _toToken
      * @param _toToken bAsset token address to withdraw from DLLR
@@ -50,7 +52,7 @@ library MyntLib {
     }
 
     /**
-     * @notice Convert DLLR _dllrAmount to _toToken utilizing EIP-2612 permit
+     * @notice Convert DLLR _dllrAmount to _toToken utilizing EIP-2612 permit via a canonical Permit2 contract
      * to reduce the additional sending transaction for doing the approval to the spender.
      *
      * @param _myntMassetManager Mynt protocol MassetManager contract address - needed for integration
@@ -101,18 +103,5 @@ library MyntLib {
         });
 
         return transferDetails;
-    }
-
-    /**
-     * @dev view function to generate permit2 signature
-     *
-     * @param _v v component of ECDSA signature
-     * @param _r r component of ECDSA signature
-     * @param _s s component of ECDSA signature
-     *
-     * @return constructed signature
-     */
-    function _generatePermit2Signature(uint8 _v, bytes32 _r, bytes32 _s) private pure returns (bytes memory) {
-        return abi.encodePacked(_r, _s, _v);
     }
 }

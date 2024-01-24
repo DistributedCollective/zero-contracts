@@ -2093,15 +2093,6 @@ contract("BorrowerOperations", async accounts => {
 
       const signature = await alice_signer.signTypedData(domain, types, values);
 
-      const {v, r, s} = th.extractSignature(signature);
-
-      const permitParams = {
-          deadline: deadline,
-          v: v,
-          r: r,
-          s: s
-      }
-
       await th.repayZusdFromDLLRWithPermit2(alice, contracts, decreaseAmount, permitTransferFrom, signature);
 
       const debtAfter = await getTroveEntireDebt(alice);
@@ -3587,15 +3578,6 @@ contract("BorrowerOperations", async accounts => {
       const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
 
       const signature = await alice_signer.signTypedData(domain, types, values);
-
-      const {v, r, s} = th.extractSignature(signature);
-
-      const permitParams = {
-          deadline: deadline,
-          v: v,
-          r: r,
-          s: s
-      }
       
       await borrowerOperations.adjustNueTroveWithPermit2(
         th._100pct,
@@ -4400,15 +4382,6 @@ contract("BorrowerOperations", async accounts => {
       const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
 
       const signature = await alice_signer.signTypedData(domain, types, values);
-
-      const {v, r, s} = th.extractSignature(signature);
-
-      const permitParams = {
-          deadline: deadline,
-          v: v,
-          r: r,
-          s: s
-      }
 
       await borrowerOperations.closeNueTroveWithPermit2(permitTransferFrom, signature, { from: alice });
 

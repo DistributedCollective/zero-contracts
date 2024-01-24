@@ -206,7 +206,7 @@ contract TroveManagerRedeemOps is TroveManagerBase, Permit2Handler {
     }
 
     ///DLLR _owner can use Sovryn Mynt to convert DLLR to ZUSD, then use the Zero redemption mechanism to redeem ZUSD for RBTC, all in a single transaction
-    function redeemCollateralViaDLLRWithPermit2(
+    function redeemCollateralViaDllrWithPermit2(
         uint256 _dllrAmount,
         address _firstRedemptionHint,
         address _upperPartialRedemptionHint,

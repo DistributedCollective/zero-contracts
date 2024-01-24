@@ -16,13 +16,14 @@ const func: DeployFunction = async (hre) => {
         network
     } = hre;
 
+    const permit2Deployment = await get("Permit2");
     const { deployer } = await getNamedAccounts();
     const troveManager: TroveManager = (await ethers.getContract(
         "TroveManager"
     )) as unknown as TroveManager;
     const tx = await deploy(deploymentName, {
         from: deployer,
-        args: [(await troveManager.BOOTSTRAP_PERIOD()).toString()],
+        args: [(await troveManager.BOOTSTRAP_PERIOD()).toString(), permit2Deployment.address],
         log: true,
     });
 

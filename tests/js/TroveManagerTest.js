@@ -2435,7 +2435,7 @@ contract('TroveManager', async accounts => {
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
-    const redemptionTx = await troveManager.redeemCollateralViaDLLRWithPermit2(
+    const redemptionTx = await troveManager.redeemCollateralViaDllrWithPermit2(
       redemptionAmount.toString(),
       firstRedemptionHint,
       upperPartialRedemptionHint,

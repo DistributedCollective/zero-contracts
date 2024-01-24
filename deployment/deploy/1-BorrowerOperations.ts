@@ -5,9 +5,14 @@ const path = require("path");
 const deploymentName = getContractNameFromScriptFileName(path.basename(__filename));
 
 const func: DeployFunction = async (hre) => {
-    const { getNamedAccounts } = hre;
+    const { 
+        deployments: { get },
+        getNamedAccounts
+    } = hre;
     const { deployer } = await getNamedAccounts();
-    await deployWithCustomProxy(hre, deployer, deploymentName, "UpgradableProxy");
+
+    const permit2Deployment = await get("Permit2");
+    await deployWithCustomProxy(hre, deployer, deploymentName, "UpgradableProxy", false, "", "", [permit2Deployment.address]);
 };
 
 func.tags = [deploymentName];

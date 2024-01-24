@@ -188,7 +188,7 @@ interface ITroveManager is ILiquityBase {
         IMassetManager.PermitParams calldata _permitParams
     ) external;
 
-    function redeemCollateralViaDLLRWithPermit2(
+    function redeemCollateralViaDllrWithPermit2(
         uint256 _dllrAmount,
         address _firstRedemptionHint,
         address _upperPartialRedemptionHint,

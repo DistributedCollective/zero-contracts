@@ -124,7 +124,7 @@ describe("SIP-SOV3564: Upgrade StabilityPool, BorrowerOperations, TroveManager, 
         //const stakingProxy:  =
 
         // DEPLOY CONTRACTS
-        await deployments.fixture(["StabilityPool", "BorrowerOperations", "TroveManager"], {
+        await deployments.fixture(["StabilityPool", "BorrowerOperations", "TroveManagerRedeemOps", "TroveManager"], {
             keepExistingDeployments: true,
         });
 
