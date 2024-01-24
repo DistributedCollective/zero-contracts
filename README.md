@@ -1,7 +1,7 @@
 # @sovryn-zero/contracts  
 
-[![GitHub license](https://img.shields.io/github/license/DistributedCollective/zero)](/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/DistributedCollective/zero)](https://github.com/DistributedCollective/zero/stargazers)
+[![GitHub license](https://img.shields.io/github/license/DistributedCollective/zero-contracts)](/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/DistributedCollective/zero-contracts)](https://github.com/DistributedCollective/zero-contracts/stargazers)
 [![Zero README](https://img.shields.io/badge/readme-gray?style=flat&logo=ZeroMQ&logoColor=green&link=/README.md)](/README.md)  
 
   Zero solidity contracts
