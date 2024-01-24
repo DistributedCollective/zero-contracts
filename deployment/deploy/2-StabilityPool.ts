@@ -12,7 +12,7 @@ const func: DeployFunction = async (hre) => {
     const { deployer } = await getNamedAccounts();
 
     const permit2Deployment = await get("Permit2");
-    await deployWithCustomProxy(hre, deployer, deploymentName, "UpgradableProxy", false, "", "", [permit2Deployment.address]);
+    await deployWithCustomProxy(hre, deployer, deploymentName, "UpgradableProxy", false, "MultiSigWallet", "", [permit2Deployment.address]);
 };
 
 func.tags = [deploymentName];
