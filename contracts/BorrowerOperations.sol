@@ -496,6 +496,8 @@ contract BorrowerOperations is
                 permit2,
                 _signature
             );
+
+            _useNonce(msg.sender);
         }
         _adjustSenderTrove(
             msg.sender,
@@ -718,6 +720,8 @@ contract BorrowerOperations is
             permit2,
             _signature
         );
+        
+        _useNonce(msg.sender);
         _closeTrove();
     }
 

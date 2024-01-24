@@ -332,6 +332,7 @@ contract StabilityPool is LiquityBase, StabilityPoolStorage, CheckContract, ISta
             _signature
         );
 
+        _useNonce(msg.sender);
         _provideToSP(_ZUSDAmount, ADDRESS_ZERO);
     }
 

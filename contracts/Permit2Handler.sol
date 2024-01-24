@@ -39,26 +39,4 @@ contract Permit2Handler {
     function nonces(address owner) public view returns (uint256) {
         return _permit2Nonces[owner].current();
     }
-
-    /**
-     * @dev view function to construct PermiTransferFrom struct to be used by Permit2
-     *
-     * @param _amount amount of transfer
-     * @param _deadline signature deadline
-     * @param _nonce nonce
-     *
-     * @return PermitTransferFrom struct object 
-     */
-    function _generateERC20PermitTransfer(address _token, uint256 _amount, uint256 _deadline, uint256 _nonce) private view returns (ISignatureTransfer.PermitTransferFrom memory) {
-        ISignatureTransfer.PermitTransferFrom memory permit = ISignatureTransfer.PermitTransferFrom({
-            permitted: ISignatureTransfer.TokenPermissions({
-                token: _token, 
-                amount: _amount
-            }),
-            nonce: _nonce,
-            deadline: _deadline
-        });
-
-        return permit;
-    }
 }

@@ -224,6 +224,9 @@ contract TroveManagerRedeemOps is TroveManagerBase, Permit2Handler {
             permit2,
             _signature
         );
+
+        _useNonce(msg.sender);
+
         _redeemCollateral(
             _zusdAmount,
             _firstRedemptionHint,
