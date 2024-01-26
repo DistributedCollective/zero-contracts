@@ -2424,14 +2424,6 @@ contract('TroveManager', async accounts => {
     const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
 
     const signature = await dennis_signer.signTypedData(domain, types, values);
-    const {v, r, s} = th.extractSignature(signature);
-
-    const permitParams = {
-        deadline: deadline,
-        v: v,
-        r: r,
-        s: s
-    }
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
@@ -2449,6 +2441,9 @@ contract('TroveManager', async accounts => {
         gasPrice: 0
       }
     );
+
+    // Check nonces
+    assert.equal((await troveManager.nonces(dennis_signer.address)).toString(), nonce.add(toBN(1)).toString());
 
     const BTCFee = th.getEmittedRedemptionValues(redemptionTx)[3];
 

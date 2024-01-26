@@ -2095,6 +2095,9 @@ contract("BorrowerOperations", async accounts => {
 
       await th.repayZusdFromDLLRWithPermit2(alice, contracts, decreaseAmount, permitTransferFrom, signature);
 
+      // Check nonces
+      assert.equal((await borrowerOperations.nonces(alice_signer.address)).toString(), nonce.add(toBN(1)).toString());
+
       const debtAfter = await getTroveEntireDebt(alice);
       const collAfter = await getTroveEntireColl(alice);
       const nueBalance_After = await nueMockToken.balanceOf(alice);
@@ -3591,6 +3594,9 @@ contract("BorrowerOperations", async accounts => {
         { from: alice }
       );
 
+      // Check nonces
+      assert.equal((await borrowerOperations.nonces(alice_signer.address)).toString(), nonce.add(toBN(1)).toString());
+
       const debtAfter = await getTroveEntireDebt(alice);
       const collAfter = await getTroveEntireColl(alice);
       const nueBalance_After = await nueMockToken.balanceOf(alice);
@@ -4384,6 +4390,9 @@ contract("BorrowerOperations", async accounts => {
       const signature = await alice_signer.signTypedData(domain, types, values);
 
       await borrowerOperations.closeNueTroveWithPermit2(permitTransferFrom, signature, { from: alice });
+
+      // Check nonces
+      assert.equal((await borrowerOperations.nonces(alice_signer.address)).toString(), nonce.add(toBN(1)).toString());
 
       const aliceCollAfter = await getTroveEntireColl(alice);
       assert.equal(aliceCollAfter, "0");

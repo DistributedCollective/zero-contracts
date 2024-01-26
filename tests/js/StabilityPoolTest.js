@@ -160,15 +160,6 @@ contract('StabilityPool', async accounts => {
 
       const signature = await alice_signer.signTypedData(domain, types, values);
 
-      const {v, r, s} = th.extractSignature(signature);
-
-      const permitParams = {
-          deadline: deadline,
-          v: v,
-          r: r,
-          s: s
-      }
-
       // --- TEST ---
       // check user's deposit record before
       const alice_depositRecord_Before = await stabilityPool.deposits(alice);
@@ -182,6 +173,9 @@ contract('StabilityPool', async accounts => {
 
       // provideToSP()
       await stabilityPool.provideToSpFromDllrWithPermit2(spAmount.toString(), permitTransferFrom, signature, { from: alice });
+
+      // Check nonces
+      assert.equal((await stabilityPool.nonces(alice_signer.address)).toString(), nonce.add(toBN(1)).toString());
 
       // check balances
       const alice_depositRecord_After = (await stabilityPool.deposits(alice))[0];
