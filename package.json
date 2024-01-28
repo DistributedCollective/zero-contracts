@@ -16,6 +16,8 @@
     "prepare": "echo 'commented out: run-s prepare:*'",
     "lint": "eslint",
     "lint:fix": "yarn run lint . --fix",
+    "prettier:write-sol": "prettier --write contracts/{*,**/*,**/**/*,**/**/**/*,**/**/**/**/*}.sol 2>&1 | grep -v 'No files matching the pattern were found'",
+    "prettier:check-sol": "prettier --check contracts/{*,**/*,**/**/*,**/**/**/*,**/**/**/**/*}.sol 2>&1 | grep -v 'No files matching the pattern were found'",
     "prettier:check": "yarn prettier --check .",
     "prettier:write": "yarn prettier --write .",
     "do-prepare:format": "yarn run prettier:write && yarn run lint:fix",
