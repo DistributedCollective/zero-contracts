@@ -22,7 +22,6 @@ const timeValues = testHelpers.TimeValues;
 const ZERO_ADDRESS = th.ZERO_ADDRESS;
 const assertRevert = th.assertRevert;
 
-
 /* NOTE: Some of the borrowing tests do not test for specific ZUSD fee values. They only test that the
  * fees are non-zero when they should occur, and that they decay over time.
  *
@@ -2075,7 +2074,7 @@ contract("BorrowerOperations", async accounts => {
 
       // Alice adjusts trove coll and debt decrease (-0.5 ETH, -50ZUSD)
       await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: alice });
-      const nonce = await borrowerOperations.nonces(alice_signer.address);
+      const nonce = th.generateNonce();
       const deadline = th.toDeadline(1000 * 60 * 60 * 30 /** 30 minutes */);
       const permitTransferFrom = {
         permitted: {
@@ -2093,10 +2092,12 @@ contract("BorrowerOperations", async accounts => {
 
       const signature = await alice_signer.signTypedData(domain, types, values);
 
+      expect(await th.isUsedNonce(permit2, alice_signer.address, nonce.toString())).to.equal(false);
+
       await th.repayZusdFromDLLRWithPermit2(alice, contracts, decreaseAmount, permitTransferFrom, signature);
 
       // Check nonces
-      assert.equal((await borrowerOperations.nonces(alice_signer.address)).toString(), nonce.add(toBN(1)).toString());
+      expect(await th.isUsedNonce(permit2, alice_signer.address, nonce.toString())).to.equal(true);
 
       const debtAfter = await getTroveEntireDebt(alice);
       const collAfter = await getTroveEntireColl(alice);
@@ -3564,7 +3565,7 @@ contract("BorrowerOperations", async accounts => {
       const decreaseAmount = toBN(dec(50, 16));
       // Alice adjusts trove coll and debt decrease (-0.5 ETH, -50ZUSD)
       await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: alice });
-      const nonce = await borrowerOperations.nonces(alice_signer.address);
+      const nonce = th.generateNonce();
       const deadline = th.toDeadline(1000 * 60 * 60 * 30 /** 30 minutes */);
       const permitTransferFrom = {
         permitted: {
@@ -3582,6 +3583,8 @@ contract("BorrowerOperations", async accounts => {
 
       const signature = await alice_signer.signTypedData(domain, types, values);
       
+      expect(await th.isUsedNonce(permit2, alice_signer.address, nonce.toString())).to.equal(false);
+
       await borrowerOperations.adjustNueTroveWithPermit2(
         th._100pct,
         dec(500, "finney"),
@@ -3595,7 +3598,7 @@ contract("BorrowerOperations", async accounts => {
       );
 
       // Check nonces
-      assert.equal((await borrowerOperations.nonces(alice_signer.address)).toString(), nonce.add(toBN(1)).toString());
+      expect(await th.isUsedNonce(permit2, alice_signer.address, nonce.toString())).to.equal(true);
 
       const debtAfter = await getTroveEntireDebt(alice);
       const collAfter = await getTroveEntireColl(alice);
@@ -4371,7 +4374,7 @@ contract("BorrowerOperations", async accounts => {
       const value = (await troveManager.getTroveDebt(alice)).sub(await borrowerOperations.ZUSD_GAS_COMPENSATION());
 
       await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: alice });
-      const nonce = await borrowerOperations.nonces(alice_signer.address);
+      const nonce = th.generateNonce();
       const deadline = th.toDeadline(1000 * 60 * 60 * 30 /** 30 minutes */);
       const permitTransferFrom = {
         permitted: {
@@ -4389,10 +4392,12 @@ contract("BorrowerOperations", async accounts => {
 
       const signature = await alice_signer.signTypedData(domain, types, values);
 
+      expect(await th.isUsedNonce(permit2, alice_signer.address, nonce.toString())).to.equal(false);
+
       await borrowerOperations.closeNueTroveWithPermit2(permitTransferFrom, signature, { from: alice });
 
       // Check nonces
-      assert.equal((await borrowerOperations.nonces(alice_signer.address)).toString(), nonce.add(toBN(1)).toString());
+      expect(await th.isUsedNonce(permit2, alice_signer.address, nonce.toString())).to.equal(true);
 
       const aliceCollAfter = await getTroveEntireColl(alice);
       assert.equal(aliceCollAfter, "0");

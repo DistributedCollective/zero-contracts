@@ -1707,6 +1707,31 @@ class TestHelper {
   
     return {v, r, s};
   }
+
+  static generateNonce() {
+    return BigInt(Math.floor(Date.now() + Math.random() * 100));
+  }
+  
+  static bitmapPositions(nonce) {
+    // Simulate logic to calculate wordPos and bitPos based on nonce
+    const wordPos = Math.floor(nonce / 256);
+    const bitPos = nonce % 256;
+    return { wordPos, bitPos };
+  }
+  
+  static async isUsedNonce(permit2, from, nonce) {
+    const { wordPos, bitPos } = this.bitmapPositions(nonce);
+    const bit = BigInt(1) << BigInt(bitPos);
+  
+    const nonceBitmapOnchain = BigInt((await permit2.nonceBitmap(from, wordPos)));
+    const flipped = nonceBitmapOnchain ^ bit;
+  
+    if ((flipped & bit) === BigInt(0)) {
+      return true;
+    }
+  
+    return false;
+  }
 }
 
 TestHelper.ZERO_ADDRESS = "0x" + "0".repeat(40);

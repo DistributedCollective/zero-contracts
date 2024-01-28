@@ -14,7 +14,7 @@ import "./Dependencies/LiquitySafeMath128.sol";
 import "./Dependencies/CheckContract.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
 import "./StabilityPoolStorage.sol";
-import "./Permit2Handler.sol";
+import "./Interfaces/IPermit2.sol";
 
 /**
  * The Stability Pool holds ZUSD tokens deposited by Stability Pool depositors.
@@ -145,9 +145,10 @@ import "./Permit2Handler.sol";
  * The product P (and snapshot P_t) is re-used, as the ratio P/P_t tracks a deposit's depletion due to liquidations.
  *
  */
-contract StabilityPool is LiquityBase, StabilityPoolStorage, CheckContract, IStabilityPool, Permit2Handler {
+contract StabilityPool is LiquityBase, StabilityPoolStorage, CheckContract, IStabilityPool {
     using LiquitySafeMath128 for uint128;
     address private constant ADDRESS_ZERO = address(0);
+    IPermit2 public immutable permit2;
 
     // --- Events ---
 
@@ -187,7 +188,9 @@ contract StabilityPool is LiquityBase, StabilityPoolStorage, CheckContract, ISta
     event EtherSent(address _to, uint256 _amount);
 
     /** Constructor */
-    constructor(address _permit2) public Permit2Handler(_permit2) {}
+    constructor(address _permit2) public {
+        permit2 = IPermit2(_permit2);
+    }
 
     // --- Contract setters ---
 
@@ -332,7 +335,6 @@ contract StabilityPool is LiquityBase, StabilityPoolStorage, CheckContract, ISta
             _signature
         );
 
-        _useNonce(msg.sender);
         _provideToSP(_ZUSDAmount, ADDRESS_ZERO);
     }
 

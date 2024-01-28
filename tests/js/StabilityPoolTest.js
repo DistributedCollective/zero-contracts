@@ -142,7 +142,7 @@ contract('StabilityPool', async accounts => {
       await openNueTrove({ extraZUSDAmount: spAmount, ICR: toBN(dec(2, 18)), extraParams: { from: alice } });
       // get ERC2612 permission from alice for stability pool to spend DLLR amount
       await nueMockToken.approve(permit2.address, th.MAX_UINT_256, { from: alice });
-      const nonce = await stabilityPool.nonces(alice_signer.address);
+      const nonce = th.generateNonce();
       const deadline = th.toDeadline(1000 * 60 * 60 * 30 /** 30 minutes */);
       const permitTransferFrom = {
         permitted: {
@@ -171,11 +171,13 @@ contract('StabilityPool', async accounts => {
       const zusdBalance_Before = await zusdToken.balanceOf(alice);
       assert.equal(zusdBalance_Before, 0);
 
+      expect(await th.isUsedNonce(permit2, alice_signer.address, nonce.toString())).to.equal(false);
+
       // provideToSP()
       await stabilityPool.provideToSpFromDllrWithPermit2(spAmount.toString(), permitTransferFrom, signature, { from: alice });
 
       // Check nonces
-      assert.equal((await stabilityPool.nonces(alice_signer.address)).toString(), nonce.add(toBN(1)).toString());
+      expect(await th.isUsedNonce(permit2, alice_signer.address, nonce.toString())).to.equal(true);
 
       // check balances
       const alice_depositRecord_After = (await stabilityPool.deposits(alice))[0];

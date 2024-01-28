@@ -15,15 +15,17 @@ import "./Dependencies/CheckContract.sol";
 import "./Dependencies/console.sol";
 import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
-import "./Permit2Handler.sol";
+import "./Interfaces/IPermit2.sol";
 
 contract BorrowerOperations is
     LiquityBase,
     BorrowerOperationsStorage,
     CheckContract,
-    IBorrowerOperations,
-    Permit2Handler
+    IBorrowerOperations
 {
+    /** CONSTANT / IMMUTABLE VARIABLE ONLY */
+    IPermit2 public immutable permit2;
+
     /* --- Variable container structs  ---
 
     Used to hold, return and assign variables inside a function, in order to avoid the error:
@@ -94,7 +96,9 @@ contract BorrowerOperations is
     event ZUSDBorrowingFeePaid(address indexed _borrower, uint256 _ZUSDFee);
 
     /** Constructor */
-    constructor(address _permit2) public Permit2Handler(_permit2) {}
+    constructor(address _permit2) public {
+        permit2 = IPermit2(_permit2);
+    }
 
     // --- Dependency setters ---
 
@@ -496,8 +500,6 @@ contract BorrowerOperations is
                 permit2,
                 _signature
             );
-
-            _useNonce(msg.sender);
         }
         _adjustSenderTrove(
             msg.sender,
@@ -720,8 +722,7 @@ contract BorrowerOperations is
             permit2,
             _signature
         );
-        
-        _useNonce(msg.sender);
+
         _closeTrove();
     }
 

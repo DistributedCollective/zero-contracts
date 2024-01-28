@@ -2407,7 +2407,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
-    const nonce = await troveManager.nonces(dennis_signer.address);
+    const nonce = th.generateNonce();
     const deadline = th.toDeadline(1000 * 60 * 60 * 60 * 24 * 28 );
     const permitTransferFrom = {
       permitted: {
@@ -2424,6 +2424,8 @@ contract('TroveManager', async accounts => {
     const { domain, types, values } = SignatureTransfer.getPermitData(permitTransferFrom, permit2.address, chainId);
 
     const signature = await dennis_signer.signTypedData(domain, types, values);
+
+    expect(await th.isUsedNonce(permit2, dennis_signer.address, nonce.toString())).to.equal(false);
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
@@ -2443,7 +2445,7 @@ contract('TroveManager', async accounts => {
     );
 
     // Check nonces
-    assert.equal((await troveManager.nonces(dennis_signer.address)).toString(), nonce.add(toBN(1)).toString());
+    expect(await th.isUsedNonce(permit2, dennis_signer.address, nonce.toString())).to.equal(true);
 
     const BTCFee = th.getEmittedRedemptionValues(redemptionTx)[3];
 
