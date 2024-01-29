@@ -10,6 +10,7 @@ import {
     Interface,
     EventLog,
     Log,
+    Addressable,
 } from "ethers";
 
 import { TransactionReceipt, TransactionResponse } from "@ethersproject/providers";
@@ -61,7 +62,7 @@ const signWithMultisig = async (hre: HardhatRuntimeEnvironment, multisigAddress,
     await (await multisig.confirmTransaction(txId)).wait();
     // console.log("Required signatures:", await multisig.required());
     console.log("Signed. Details:");
-    await multisigCheckTx(txId, multisig.target);
+    await multisigCheckTx(hre, txId, multisig.target);
 };
 
 const multisigAddOwner = async (hre: HardhatRuntimeEnvironment, addAddress, sender) => {
@@ -163,7 +164,7 @@ const multisigExecuteTx = async (
 const multisigCheckTx = async (
     hre: HardhatRuntimeEnvironment,
     txId,
-    multisigAddress: string | undefined = undefined
+    multisigAddress: string | Addressable | undefined = undefined
 ) => {
     const {
         ethers,
