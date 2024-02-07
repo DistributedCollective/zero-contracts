@@ -385,8 +385,8 @@ const deployWithCustomProxy = async (
         }
         const proxyDeployment = await get(proxyDeployedName);
         await deploymentsSave(logicName, {
-            abi: tx.abi,
-            address: proxy.address, // used to override receipt.contractAddress (useful for proxies)
+            abi: proxyDeployment.abi.concat(tx.abi),
+            address: proxy.target, // used to override receipt.contractAddress (useful for proxies)
             receipt: tx.receipt,
             bytecode: tx.bytecode,
             deployedBytecode: tx.deployedBytecode,
