@@ -117,14 +117,16 @@ const multisigExecuteTx = async (
 ) => {
     const {
         ethers,
-        deployments: { get },
+        deployments: { get, getArtifact },
     } = hre;
     const signer = await ethers.getSigner(sender);
+    //let multisigArtifact = await getArtifact("MultiSigWallet");
+    const multisigDeployment = await get("MultiSigWallet");
     const multisig = await ethers.getContractAt(
-        "MultiSigWallet",
-        multisigAddress === undefined ? (await get("MultiSigWallet")).address : multisigAddress,
-        signer
+        multisigDeployment.abi,
+        multisigDeployment.address
     );
+
     console.log("Executing multisig txId", txId, "...");
     const gasEstimated = ethers.toNumber(await multisig.executeTransaction.estimateGas(txId));
     console.log("Estimated Gas:", gasEstimated);
@@ -156,20 +158,17 @@ const multisigExecuteTx = async (
     logger.warn("===============================================================================");
     logger.success("DONE. Details:");
     console.log("Tx hash:", receipt.transactionHash);
-    console.log("Gas used:", receipt.gasUsed.toNumber());
-    await multisigCheckTx(txId, multisig.target);
+    console.log(`Gas used:, ${receipt.gasUsed}`);
+    await multisigCheckTx(hre, txId, multisig.target);
     logger.warn("===============================================================================");
 };
 
 const multisigCheckTx = async (
     hre: HardhatRuntimeEnvironment,
-    txId,
+    txId: any,
     multisigAddress: string | Addressable | undefined = undefined
 ) => {
-    const {
-        ethers,
-        deployments: { get },
-    } = hre;
+    const { ethers } = hre;
     let multisig = (await ethers.getContract("MultiSigWallet")) as MultiSigWallet;
     if (multisigAddress !== undefined) {
         multisig.attach(multisigAddress);
@@ -221,7 +220,7 @@ const multisigRevokeConfirmation = async (
     // console.log("Required signatures:", await multisig.required());
     console.log(`Confirmation of txId ${txId} revoked.`);
     console.log("Details:");
-    await multisigCheckTx(txId, multisig.target);
+    await multisigCheckTx(hre, txId, multisig.target);
 };
 
 const parseEthersLogToValue = (parsed) => {

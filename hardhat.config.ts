@@ -65,6 +65,7 @@ const mnemonic = {
 const testnetPKs = [
     process.env.TESTNET_DEPLOYER_PRIVATE_KEY ?? "",
     process.env.TESTNET_SIGNER_PRIVATE_KEY ?? "",
+    process.env.TESTNET_SIGNER_PRIVATE_KEY_2 ?? "",
 ].filter((item, i, arr) => item !== "" && arr.indexOf(item) === i);
 
 const testnetAccounts = testnetPKs.length > 0 ? testnetPKs : mnemonic;
@@ -183,6 +184,9 @@ const config: HardhatUserConfig = {
         signer: {
             default: 1,
         },
+        signer2: {
+            default: 2,
+        }
     },
     networks: {
         hardhat: {

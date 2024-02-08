@@ -10,7 +10,7 @@ import {
 } from "../scripts/helpers/helpers";
 
 task("multisig:sign-tx", "Sign multisig tx")
-    .addParam("id", "Multisig transaction to sign", undefined, types.string)
+    .addPositionalParam("id", "Multisig transaction to sign", undefined, types.string)
     .addOptionalParam("signer", "Signer name: 'signer' or 'deployer'", "deployer")
     .setAction(async ({ id, signer }, hre) => {
         const {
@@ -79,12 +79,7 @@ task("multisig:check-txs", "Check multiple multisig txs")
     });
 
 task("multisig:revoke-sig", "Revoke multisig tx confirmation")
-    .addPositionalParam(
-        "id",
-        "Multisig transaction to revoke confirmation from",
-        undefined,
-        types.string
-    )
+    .addParam("id", "Multisig transaction to revoke confirmation from", undefined, types.string)
     .addOptionalParam("signer", "Signer name: 'signer' or 'deployer'", "deployer")
     .setAction(async ({ id, signer }, hre) => {
         const signerAcc = (await hre.getNamedAccounts())[signer];
