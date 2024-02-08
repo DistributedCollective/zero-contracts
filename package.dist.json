@@ -1,6 +1,6 @@
 {
     "name": "@sovryn-zero/contracts",
-    "version": "0.4.0-early.access",
+    "version": "0.4.0",
     "description": "Sovryn Zero smart contracts",
     "repository": {
         "type": "git",
