@@ -219,7 +219,7 @@ contract TroveManagerRedeemOps is TroveManagerBase {
         uint256 _partialRedemptionHintNICR,
         uint256 _maxIterations,
         uint256 _maxFeePercentage,
-        ISignatureTransfer.PermitTransferFrom memory _permit,
+        ISignatureTransfer.PermitTransferFrom calldata _permit,
         bytes calldata _signature
     ) external {
         uint256 _zusdAmount = MyntLib.redeemZusdFromDllrWithPermit2(

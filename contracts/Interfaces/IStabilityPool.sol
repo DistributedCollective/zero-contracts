@@ -233,7 +233,7 @@ interface IStabilityPool {
 
     function provideToSpFromDllrWithPermit2(
         uint256 _dllrAmount,
-        ISignatureTransfer.PermitTransferFrom memory _permit,
+        ISignatureTransfer.PermitTransferFrom calldata _permit,
         bytes calldata _signature
     ) external;
 

@@ -371,7 +371,7 @@ contract BorrowerOperations is
         uint256 _dllrAmount,
         address _upperHint,
         address _lowerHint,
-        ISignatureTransfer.PermitTransferFrom memory _permit,
+        ISignatureTransfer.PermitTransferFrom calldata _permit,
         bytes calldata _signature
     ) external override {
         _adjustNueTroveWithPermit2(0, 0, _dllrAmount, false, _upperHint, _lowerHint, _permit, _signature);
@@ -425,7 +425,7 @@ contract BorrowerOperations is
         bool _isDebtIncrease,
         address _upperHint,
         address _lowerHint,
-        ISignatureTransfer.PermitTransferFrom memory _permit,
+        ISignatureTransfer.PermitTransferFrom calldata _permit,
         bytes calldata _signature
     ) external payable override {
         _adjustNueTroveWithPermit2(
@@ -487,7 +487,7 @@ contract BorrowerOperations is
         bool _isDebtIncrease,
         address _upperHint,
         address _lowerHint,
-        ISignatureTransfer.PermitTransferFrom memory _permit,
+        ISignatureTransfer.PermitTransferFrom calldata _permit,
         bytes calldata _signature
     ) internal {
         require(address(massetManager) != address(0), "Masset address not set");
@@ -710,7 +710,7 @@ contract BorrowerOperations is
         _closeTrove();
     }
 
-    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom memory _permit, bytes calldata _signature) external override {
+    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom calldata _permit, bytes calldata _signature) external override {
         require(address(massetManager) != address(0), "Masset address not set");
 
         uint256 debt = troveManager.getTroveDebt(msg.sender);

@@ -168,7 +168,7 @@ interface IBorrowerOperations {
         uint256 _dllrAmount,
         address _upperHint,
         address _lowerHint,
-        ISignatureTransfer.PermitTransferFrom memory _permit,
+        ISignatureTransfer.PermitTransferFrom calldata _permit,
         bytes calldata _signature
     ) external;
 
@@ -190,7 +190,7 @@ interface IBorrowerOperations {
      * Requires the borrower have a NUE balance sufficient to repay their trove's debt, excluding gas compensation - i.e. `(debt - 50)` NUE.
      * This method is identical to `closeTrove()`, but operates on NUE tokens instead of ZUSD.
      */
-    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom memory _permit, bytes calldata _signature) external;
+    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom calldata _permit, bytes calldata _signature) external;
 
     /**
      * @notice enables a borrower to simultaneously change both their collateral and debt, subject to all the restrictions that apply to individual increases/decreases of each quantity with the following particularity:
@@ -256,7 +256,7 @@ interface IBorrowerOperations {
         bool isDebtIncrease,
         address _upperHint,
         address _lowerHint,
-        ISignatureTransfer.PermitTransferFrom memory _permit,
+        ISignatureTransfer.PermitTransferFrom calldata _permit,
         bytes calldata _signature
     ) external payable;
 

@@ -324,7 +324,7 @@ contract StabilityPool is LiquityBase, StabilityPoolStorage, CheckContract, ISta
     ///DLLR _owner or _spender can convert a specified amount of DLLR into ZUSD via Sovryn Mynt and deposit the ZUSD into the Zero Stability Pool, all in a single transaction
     function provideToSpFromDllrWithPermit2(
         uint256 _dllrAmount,
-        ISignatureTransfer.PermitTransferFrom memory _permit,
+        ISignatureTransfer.PermitTransferFrom calldata _permit,
         bytes calldata _signature
     ) external override {
         uint256 _ZUSDAmount = MyntLib.redeemZusdFromDllrWithPermit2(
