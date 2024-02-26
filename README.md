@@ -33,6 +33,11 @@ import "../BorrowerOperations.sol";
 ```  
 
 [comment]: #solidoc (Start)
+
+### Important Notes
+The TroveManager deployment from the hardhat deployment script will result the failure of code verfication in explorers (tenderly & rsk explorer).
+The work around is to deploy from remix, and then replace the deployment data manually to the deployment file.
+
 ### Contracts
 
 * [ActivePool](docs/ActivePool.md)
