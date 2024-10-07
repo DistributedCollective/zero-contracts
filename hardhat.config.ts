@@ -279,9 +279,9 @@ const config: HardhatUserConfig = {
         },
         rskForkedMainnet: {
             // e.g. export ACC_QTY=20 && npx hardhat node --fork https://mainnet-dev.sovryn.app/rpc --no-deploy --fork-block-number 5018378 --gasprice 66000000
-            chainId: 31337,
+            chainId: 30,
             accounts: mainnetAccounts,
-            url: "http://127.0.0.1:8545",
+            url: "https://virtual.rsk.rpc.tenderly.co/4706fd41-2e57-4ab6-8e8b-b4f51d6a631c",
             gasPrice: 66000000,
             blockGasLimit: 6800000,
             live: true,
