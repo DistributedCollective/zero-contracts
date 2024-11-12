@@ -1,0 +1,37 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "FallbackOracle",
+  "sourceName": "contracts/feeds/FallbackOracle.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "latestAnswer",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600f57600080fd5b5060888061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c806350d25bcd14602d575b600080fd5b6033604c565b6040805192835290151560208301528051918290030190f35b600080909156fea265627a7a72315820f2598ed95eeccf8885c8dbbc666b2b0c40e9f5ec71b88425db7b6a913994aa3964736f6c63430005110032",
+  "deployedBytecode": "0x6080604052348015600f57600080fd5b506004361060285760003560e01c806350d25bcd14602d575b600080fd5b6033604c565b6040805192835290151560208301528051918290030190f35b600080909156fea265627a7a72315820f2598ed95eeccf8885c8dbbc666b2b0c40e9f5ec71b88425db7b6a913994aa3964736f6c63430005110032",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -1,0 +1,33 @@
+{
+    "_format": "hh-sol-artifact-1",
+    "contractName": "FallbackOracle",
+    "address": "",
+    "abi": [
+        {
+          "inputs": [],
+          "payable": false,
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        },
+        {
+          "constant": true,
+          "inputs": [],
+          "name": "latestAnswer",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "",
+              "type": "bool"
+            }
+          ],
+          "payable": false,
+          "stateMutability": "view",
+          "type": "function"
+        }
+    ]
+}

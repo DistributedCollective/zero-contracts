@@ -15,7 +15,7 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
 
     // --- Dependency setters ---
 
-    function setAddresses(address _mainPriceFeed, address _backupPriceFeed) external onlyOwner {
+    function setAddresses(address _mainPriceFeed, address _backupPriceFeed) public onlyOwner {
         uint256 latestPrice = setAddress(0, _mainPriceFeed);
         setAddress(1, _backupPriceFeed);
 
@@ -29,7 +29,7 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
     ///         good price seen.
     /// @dev It's also callable by anyone externally
     /// @return The price
-    function fetchPrice() external override returns (uint256) {
+    function fetchPrice() external virtual override returns (uint256) {
         for (uint8 index = 0; index < 2; index++) {
             (uint256 price, bool success) = priceFeeds[index].latestAnswer();
             if (success) {
