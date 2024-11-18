@@ -15,7 +15,7 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
 
     // --- Dependency setters ---
 
-    function setAddresses(address _mainPriceFeed, address _backupPriceFeed) public onlyOwner {
+    function setAddresses(address _mainPriceFeed, address _backupPriceFeed) external onlyOwner {
         uint256 latestPrice = setAddress(0, _mainPriceFeed);
         setAddress(1, _backupPriceFeed);
 
@@ -26,10 +26,10 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
 
     /// @notice Returns the latest price obtained from the Oracle. Called by Zero functions that require a current price.
     ///         It uses the main price feed and fallback to the backup one in case of an error. If both fail return the last
-    ///         good price seen.
+    ///         good price seen. Function will rever if got false success flag from the medianizer contract.
     /// @dev It's also callable by anyone externally
     /// @return The price
-    function fetchPrice() external virtual override returns (uint256) {
+    function fetchPrice() external override returns (uint256) {
         for (uint8 index = 0; index < 2; index++) {
             (uint256 price, bool success) = priceFeeds[index].latestAnswer();
             if (success) {
@@ -39,7 +39,8 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
                 emit PriceFeedBroken(index, address(priceFeeds[index]));
             }
         }
-        return lastGoodPrice;
+        
+        revert("PriceFeed: Price feed price is stale");
     }
 
     /// @notice Allows users to setup the main and the backup price feeds
@@ -50,8 +51,7 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
         require(_index < priceFeeds.length, "Out of bounds when setting the price feed");
         checkContract(_newPriceFeed);
         priceFeeds[_index] = IExternalPriceFeed(_newPriceFeed);
-        (uint256 price, bool success) = priceFeeds[_index].latestAnswer();
-        require(success, "PriceFeed: Price feed must be working");
+        (uint256 price, bool _) = priceFeeds[_index].latestAnswer();
         emit PriceFeedUpdated(_index, _newPriceFeed);
         return price;
     }
@@ -60,5 +60,9 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
     function _storePrice(uint256 _currentPrice) internal {
         lastGoodPrice = _currentPrice;
         emit LastGoodPriceUpdated(_currentPrice);
+    }
+
+    function getPriceFeedAtIndex(uint8 _index) external view returns(address) {
+        return address(priceFeeds[_index]);
     }
 }
