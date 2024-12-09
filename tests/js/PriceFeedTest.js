@@ -60,6 +60,18 @@ contract("PriceFeed", async accounts => {
 
 
   describe("PriceFeed internal testing contract", async accounts => {
+    it("priceFeeds should return correct priceFeed at indexes", async () => {
+      await priceFeed.setAddress(0, mockedMoCPriceFeed.address);
+      await priceFeed.setAddress(1, anotherOracle.address);
+
+      const priceFeedIndex0 = await priceFeed.getPriceFeedAtIndex(0);
+      const priceFeedIndex1 = await priceFeed.getPriceFeedAtIndex(1);
+
+      assert.equal(priceFeedIndex0, mockedMoCPriceFeed.address);
+      assert.equal(priceFeedIndex1, anotherOracle.address);
+      
+    });
+
     it("fetchPrice before setPrice should return the default price", async () => {
       const price = await priceFeedTestnet.getPrice();
       assert.equal(price, dec(200, 18));
@@ -195,15 +207,15 @@ contract("PriceFeed", async accounts => {
       assert.equal(getEventArgByName(fetchTx, "PriceFeedBroken", "0").toString(), 0);
     });
 
-    it("Should return the latest price if both oracles failed", async () => {
+    it("Should revert if both oracles failed", async () => {
       setAddresses();
       await mockedMoCPriceFeed.setLatestAnswer(dec(20, 18), false);
       await mockedRskOracle.setLatestAnswer(dec(22, 18), false);
 
-      const fetchTx = await priceFeed.fetchPrice();
-      let price = await priceFeed.lastGoodPrice();
-      assert.equal(price, dec(100, 18));
-      assert.equal(getAllEventsByName(fetchTx, "PriceFeedBroken").length, 2);
+      await assertRevert(
+        priceFeed.fetchPrice(),
+        "PriceFeed: Price feed price is stale"
+      );
     });
   });
 });
