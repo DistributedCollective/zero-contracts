@@ -2,6 +2,7 @@ const deploymentHelper = require("../../utils/js/deploymentHelpers.js");
 const testHelpers = require("../../utils/js/testHelpers.js");
 const TroveManagerTester = artifacts.require("TroveManagerTester");
 const PriceFeedSovryn = artifacts.require("PriceFeedSovrynTester");
+const { getOrDeployZeroProtocolMutex } = require("../../deployment/helpers/reentrancy/utils");
 
 const th = testHelpers.TestHelper;
 const timeValues = testHelpers.TimeValues;
@@ -39,6 +40,8 @@ contract(
     let communityIssuance;
 
     before(async () => {
+      await getOrDeployZeroProtocolMutex();
+
       coreContracts = await deploymentHelper.deployLiquityCore();
       coreContracts.troveManager = await TroveManagerTester.new(coreContracts.permit2.address);
       coreContracts = await deploymentHelper.deployZUSDTokenTester(coreContracts);
