@@ -10,7 +10,9 @@ const TroveManagerTester = artifacts.require("TroveManagerTester");
 const ZUSDTokenTester = artifacts.require("./ZUSDTokenTester");
 const MassetManagerTester = artifacts.require("MassetManagerTester");
 const NueMockToken = artifacts.require("NueMockToken");
+const BorrowerOperationsCrossReentrancy = artifacts.require("BorrowerOperationsCrossReentrancy");
 const { AllowanceProvider, PermitTransferFrom, SignatureTransfer } = require("@uniswap/permit2-sdk");
+const { getOrDeployZeroProtocolMutex } = require("../../deployment/helpers/reentrancy/utils");
 
 const th = testHelpers.TestHelper;
 
@@ -184,6 +186,9 @@ contract("BorrowerOperations", async accounts => {
     let revertToSnapshot;
 
     beforeEach(async () => {
+      // The Mutex singleton must be deployed for SharedReentrancyGuard to work
+      await getOrDeployZeroProtocolMutex();
+
       let snapshot = await timeMachine.takeSnapshot();
       revertToSnapshot = () => timeMachine.revertToSnapshot(snapshot["result"]);
     });
@@ -6994,6 +6999,27 @@ contract("BorrowerOperations", async accounts => {
           .div(troveTotalDebt.add(liquidatedDebt).add(toBN(debtChange)));
 
         assert.isTrue(newTCR.eq(expectedTCR));
+      });
+
+      it("openTrove(): open a Trove, then close it in the same block should revert", async () => {
+
+        const extraZUSDAmount = toBN(dec(10000, 18));
+        const MIN_DEBT = (
+          await th.getNetBorrowingAmount(contracts, await contracts.borrowerOperations.MIN_NET_DEBT())
+        ).add(th.toBN(1)); // add 1 to avoid rounding issues
+        const zusdAmount = MIN_DEBT.add(extraZUSDAmount);
+
+        const price = await contracts.priceFeedTestnet.getPrice();
+        const totalDebt = await th.getOpenTroveTotalDebt(contracts, zusdAmount);
+        const ICR = toBN(dec(2, 18));
+        const borrowerOperationsCrossReentrancy = await BorrowerOperationsCrossReentrancy.new(contracts.borrowerOperations.address);
+        await th.assertRevert(borrowerOperationsCrossReentrancy.testCrossReentrancy(
+          th._100pct,
+          extraZUSDAmount,
+          whale,
+          whale,
+          {value: ICR.mul(totalDebt).div(price)}
+        ), "ZeroProtocolMutex: mutex locked");
       });
     });
 
