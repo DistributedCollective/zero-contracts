@@ -7001,9 +7001,13 @@ contract("BorrowerOperations", async accounts => {
         assert.isTrue(newTCR.eq(expectedTCR));
       });
 
-      it("openTrove(): open a Trove, then close it in the same block should revert", async () => {
+      it("openTrove(): open a Trove, then adjust it in the same block should revert", async () => {
+        await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } });
+        await priceFeed.setPrice("105000000000000000000");
 
-        const extraZUSDAmount = toBN(dec(10000, 18));
+        assert.isTrue(await th.checkRecoveryMode(contracts));
+
+        const extraZUSDAmount = toBN(dec(1000, 18));
         const MIN_DEBT = (
           await th.getNetBorrowingAmount(contracts, await contracts.borrowerOperations.MIN_NET_DEBT())
         ).add(th.toBN(1)); // add 1 to avoid rounding issues
@@ -7013,13 +7017,17 @@ contract("BorrowerOperations", async accounts => {
         const totalDebt = await th.getOpenTroveTotalDebt(contracts, zusdAmount);
         const ICR = toBN(dec(2, 18));
         const borrowerOperationsCrossReentrancy = await BorrowerOperationsCrossReentrancy.new(contracts.borrowerOperations.address);
-        await th.assertRevert(borrowerOperationsCrossReentrancy.testCrossReentrancy(
-          th._100pct,
-          extraZUSDAmount,
-          whale,
-          whale,
-          {value: ICR.mul(totalDebt).div(price)}
-        ), "ZeroProtocolMutex: mutex locked");
+
+        await assertRevert(
+          borrowerOperationsCrossReentrancy.testCrossReentrancy(
+            th._100pct,
+            extraZUSDAmount,
+            whale,
+            whale,
+            priceFeed.address,
+            {value: ICR.mul(totalDebt).div(price)}),
+          "ZeroProtocolMutex: mutex locked"
+        );
       });
     });
 

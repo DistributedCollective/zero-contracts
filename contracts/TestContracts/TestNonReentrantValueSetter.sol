@@ -6,11 +6,13 @@ import "../Dependencies/reentrancy/SharedReentrancyGuard.sol";
 contract TestNonReentrantValueSetter is SharedReentrancyGuard {
     uint256 public value;
 
-    function setValueOpening(uint256 newValue) public nonReentrantAtOpening {
+    function setValueOpening(uint256 newValue) public {
+        nonReentrantCheck(true);
         value = newValue;
     }
 
-    function setValueClosing(uint256 newValue) public nonReentrantAtClosing {
+    function setValueClosing(uint256 newValue) public {
+        nonReentrantCheck(false);
         value = newValue;
     }
 
@@ -18,7 +20,8 @@ contract TestNonReentrantValueSetter is SharedReentrancyGuard {
     function setOtherContractValueNonReentrant(
         address other,
         uint256 newValue
-    ) external nonReentrantAtOpening {
+    ) external {
+        nonReentrantCheck(true);
         TestNonReentrantValueSetter(other).setValueClosing(newValue);
     }
 }

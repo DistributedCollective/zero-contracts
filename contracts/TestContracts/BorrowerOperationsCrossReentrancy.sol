@@ -3,6 +3,10 @@ pragma solidity 0.6.11;
 
 import "../Interfaces/IBorrowerOperations.sol";
 
+interface IPriceFeedTestnet {
+    function setPrice(uint256 price) external returns (bool);
+}
+
 contract BorrowerOperationsCrossReentrancy {
     IBorrowerOperations public borrowerOperations;
 
@@ -18,7 +22,8 @@ contract BorrowerOperationsCrossReentrancy {
         uint256 _maxFeePercentage,
         uint256 _ZUSDAmount,
         address _upperHint,
-        address _lowerHint
+        address _lowerHint,
+        address _priceFeed
     ) public payable {
         borrowerOperations.openTrove{value: msg.value}(
             _maxFeePercentage,
@@ -27,7 +32,10 @@ contract BorrowerOperationsCrossReentrancy {
             _lowerHint
         );
 
+        // manipulate the price so that the recovery mode will be triggered
+        IPriceFeedTestnet(_priceFeed).setPrice(1e8);
+
         // // should revert due to reentrancy violation
-        borrowerOperations.closeTrove();
+        borrowerOperations.addColl(_upperHint, _lowerHint);
     }
 }

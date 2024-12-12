@@ -26,36 +26,13 @@ contract SharedReentrancyGuard {
     IZeroProtocolMutex private constant MUTEX = IZeroProtocolMutex(0x42B023F998d7B9c127e9bDcDCE57ccd1f5e1d919);
 
     /*
-     * This is the modifier that will be used to set the user's block number when opening/increasing trove
+     * @dev function that is responsible to handle the mutex (user's block number) check
+     * @param _isOpening flag whether it is true (opening, increasing), and false (closing, decreasing)
+     * If it is true, it will just set the user's block number to the current block number
+     * If it is false and the user's block number was not 0, it will check the user's block number to be not the same block
+     * and if the check pass, it will reset the user's block number to 0
      */
-    modifier nonReentrantAtOpening() {
-        MUTEX.handleMutex(true);
-
-        _;
-    }
-
-    /*
-     * This is the modifier that will be used to check the user's block number to be not the same block
-     * And if the check pass, it will reset the user's block number to 0
-     * when closing trove
-     */
-    modifier nonReentrantAtClosing() {
-        MUTEX.handleMutex(false);
-
-        _;
-    }
-
-    /*
-     * In case of _isDebtIncrease true it will do the same behaviour as nonReentrantAtOpening
-     * Otherwise it will do the nonReentrantAtClosing
-     */
-    modifier nonReentrantAtTroveAdjustment(bool _isDebtIncrease) {
-        if(_isDebtIncrease) {
-            MUTEX.handleMutex(true);
-        } else {
-            MUTEX.handleMutex(false);
-        }
-
-        _;
+    function nonReentrantCheck(bool _isOpening) internal {
+        MUTEX.handleMutex(_isOpening);
     }
 }
