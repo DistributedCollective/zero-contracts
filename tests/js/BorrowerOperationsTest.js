@@ -12,7 +12,6 @@ const MassetManagerTester = artifacts.require("MassetManagerTester");
 const NueMockToken = artifacts.require("NueMockToken");
 const BorrowerOperationsCrossReentrancy = artifacts.require("BorrowerOperationsCrossReentrancy");
 const { AllowanceProvider, PermitTransferFrom, SignatureTransfer } = require("@uniswap/permit2-sdk");
-const { getOrDeployZeroProtocolMutex } = require("../../deployment/helpers/reentrancy/utils");
 
 const th = testHelpers.TestHelper;
 
@@ -186,9 +185,6 @@ contract("BorrowerOperations", async accounts => {
     let revertToSnapshot;
 
     beforeEach(async () => {
-      // The Mutex singleton must be deployed for SharedReentrancyGuard to work
-      await getOrDeployZeroProtocolMutex();
-
       let snapshot = await timeMachine.takeSnapshot();
       revertToSnapshot = () => timeMachine.revertToSnapshot(snapshot["result"]);
     });

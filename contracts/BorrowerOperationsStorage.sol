@@ -36,4 +36,9 @@ contract BorrowerOperationsStorage is Ownable {
 
     IMassetManager public massetManager;
     IFeeDistributor public feeDistributor;
+
+    /*
+     * to store the user's block number
+     */
+    mapping(address => uint256) public userBlockNumber;
 }

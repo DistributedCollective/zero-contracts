@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
@@ -16,14 +15,12 @@ import "./Dependencies/console.sol";
 import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
 import "./Interfaces/IPermit2.sol";
-import "./Dependencies/reentrancy/SharedReentrancyGuard.sol";
 
 contract BorrowerOperations is
     LiquityBase,
     BorrowerOperationsStorage,
     CheckContract,
-    IBorrowerOperations,
-    SharedReentrancyGuard
+    IBorrowerOperations
 {
     /** CONSTANT / IMMUTABLE VARIABLE ONLY */
     IPermit2 public immutable permit2;
@@ -161,6 +158,25 @@ contract BorrowerOperations is
         emit ZEROStakingAddressChanged(_zeroStakingAddress);
     }
 
+    /*
+     * @notice set the user's block number for opening, and do check & reset to 0 for closing
+     *
+     * @dev This is the function will be called by the open, close, increase, decrease trove function
+     */
+    function notInTheSameBlockHandler(bool _isOpening) private {
+        if(_isOpening) {
+            userBlockNumber[tx.origin] = block.number;
+        } else {
+            if(userBlockNumber[tx.origin] > 0) {
+                if(userBlockNumber[tx.origin] == block.number) {
+                    revert("ZeroProtocolMutex: mutex locked");
+                }
+
+                userBlockNumber[tx.origin] = 0;
+            }
+        }
+    }
+
     function setMassetManagerAddress(address _massetManagerAddress) external onlyOwner {
         massetManager = IMassetManager(_massetManagerAddress);
         emit MassetManagerAddressChanged(_massetManagerAddress);
@@ -205,7 +221,7 @@ contract BorrowerOperations is
         vars.price = priceFeed.fetchPrice();
         bool isRecoveryMode = _checkRecoveryMode(vars.price);
 
-        if(isRecoveryMode) nonReentrantCheck(true);
+        if(isRecoveryMode) notInTheSameBlockHandler(true);
 
         _requireValidMaxFeePercentage(_maxFeePercentage, isRecoveryMode);
         _requireTroveisNotActive(contractsCache.troveManager, msg.sender);
@@ -590,7 +606,7 @@ contract BorrowerOperations is
         vars.isRecoveryMode = _checkRecoveryMode(vars.price);
 
         if(vars.isRecoveryMode) {
-            nonReentrantCheck(_isDebtIncrease);
+            notInTheSameBlockHandler(_isDebtIncrease);
         }
 
         if (_isDebtIncrease) {
