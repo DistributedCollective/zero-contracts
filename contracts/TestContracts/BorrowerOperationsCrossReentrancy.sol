@@ -32,9 +32,6 @@ contract BorrowerOperationsCrossReentrancy {
             _lowerHint
         );
 
-        // manipulate the price so that the recovery mode will be triggered
-        IPriceFeedTestnet(_priceFeed).setPrice(1e8);
-
         // // should revert due to reentrancy violation
         borrowerOperations.addColl(_upperHint, _lowerHint);
     }

@@ -159,20 +159,20 @@ contract BorrowerOperations is
     }
 
     /*
-     * @notice set the user's block number for opening, and do check & reset to 0 for closing
+     * @notice set the user's block number for opening or increasing LoCs, and do check & reset to 0 for closing or decreasing
      *
      * @dev This is the function will be called by the open, close, increase, decrease trove function
      */
-    function notInTheSameBlockHandler(bool _isOpening) private {
-        if(_isOpening) {
-            userBlockNumber[tx.origin] = block.number;
+    function recoveryModeMutexHandler(bool _openOrIncrease) private {
+        if(_openOrIncrease) {
+            recoveryModeMutex[msg.sender] = block.number;
         } else {
-            if(userBlockNumber[tx.origin] > 0) {
-                if(userBlockNumber[tx.origin] == block.number) {
-                    revert("ZeroProtocolMutex: mutex locked");
+            if(recoveryModeMutex[msg.sender] > 0) {
+                if(recoveryModeMutex[msg.sender] == block.number) {
+                    revert("Recovery mode mutex locked. Try in another block");
                 }
 
-                userBlockNumber[tx.origin] = 0;
+                recoveryModeMutex[msg.sender] = 0;
             }
         }
     }
@@ -221,7 +221,7 @@ contract BorrowerOperations is
         vars.price = priceFeed.fetchPrice();
         bool isRecoveryMode = _checkRecoveryMode(vars.price);
 
-        if(isRecoveryMode) notInTheSameBlockHandler(true);
+        if(isRecoveryMode) recoveryModeMutexHandler(true);
 
         _requireValidMaxFeePercentage(_maxFeePercentage, isRecoveryMode);
         _requireTroveisNotActive(contractsCache.troveManager, msg.sender);
@@ -606,7 +606,7 @@ contract BorrowerOperations is
         vars.isRecoveryMode = _checkRecoveryMode(vars.price);
 
         if(vars.isRecoveryMode) {
-            notInTheSameBlockHandler(_isDebtIncrease);
+            recoveryModeMutexHandler(_isDebtIncrease);
         }
 
         if (_isDebtIncrease) {

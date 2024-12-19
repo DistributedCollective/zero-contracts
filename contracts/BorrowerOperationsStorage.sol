@@ -38,7 +38,7 @@ contract BorrowerOperationsStorage is Ownable {
     IFeeDistributor public feeDistributor;
 
     /*
-     * to store the user's block number
+     * Store the LoC block number on open/increase when in the Recovery mode
      */
-    mapping(address => uint256) public userBlockNumber;
+    mapping(address => uint256) public recoveryModeMutex;
 }
