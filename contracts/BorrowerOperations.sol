@@ -221,7 +221,9 @@ contract BorrowerOperations is
         vars.price = priceFeed.fetchPrice();
         bool isRecoveryMode = _checkRecoveryMode(vars.price);
 
-        if(isRecoveryMode) recoveryModeMutexHandler(true);
+        if(isRecoveryMode && _ZUSDAmount > 0) {
+            recoveryModeMutexHandler(true);
+        }
 
         _requireValidMaxFeePercentage(_maxFeePercentage, isRecoveryMode);
         _requireTroveisNotActive(contractsCache.troveManager, msg.sender);
@@ -605,7 +607,7 @@ contract BorrowerOperations is
         vars.price = priceFeed.fetchPrice();
         vars.isRecoveryMode = _checkRecoveryMode(vars.price);
 
-        if(vars.isRecoveryMode) {
+        if(vars.isRecoveryMode && _ZUSDChange > 0) {
             recoveryModeMutexHandler(_isDebtIncrease);
         }
 
