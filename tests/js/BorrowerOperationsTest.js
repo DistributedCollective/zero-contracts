@@ -7052,6 +7052,48 @@ contract("BorrowerOperations", async accounts => {
           "Recovery mode mutex locked. Try in another block"
         );
       });
+
+      it("open trove, increase the debt, then decrease the debt in the same block should revert due to reentrancy", async () => {
+        await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: alice } });
+        await priceFeed.setPrice("105000000000000000000");
+        assert.isTrue(await th.checkRecoveryMode(contracts));
+
+        const extraZUSDAmount = toBN(dec(1000, 18));
+        const MIN_DEBT = (
+          await th.getNetBorrowingAmount(contracts, await contracts.borrowerOperations.MIN_NET_DEBT())
+        ).add(th.toBN(1)); // add 1 to avoid rounding issues
+        const zusdAmount = MIN_DEBT.add(extraZUSDAmount);
+
+        const price = await contracts.priceFeedTestnet.getPrice();
+        const totalDebt = await th.getOpenTroveTotalDebt(contracts, zusdAmount);
+        const ICR = toBN(dec(2, 18));
+
+        const borrowerOperationsCrossReentrancy = await BorrowerOperationsCrossReentrancy.new(contracts.borrowerOperations.address);
+        // Fund the contract with ETH for gas
+        await hre.network.provider.send("hardhat_setBalance", [
+          borrowerOperationsCrossReentrancy.address,
+          "0x56BC75E2D63100000", // 100 ETH in hex
+        ]);
+        // Impersonate the borrower test contract
+        await hre.network.provider.request({
+          method: "hardhat_impersonateAccount",
+          params: [borrowerOperationsCrossReentrancy.address],
+        });
+
+        await openTrove({ maxFeePercentage: th._100pct, extraZUSDAmount, whale, whale, ICR, extraParams: { value: ICR.mul(totalDebt).div(price).mul(toBN(10)), from: borrowerOperationsCrossReentrancy.address } });
+        await priceFeed.setPrice("10000000000000000000");
+
+        const ZUSDwithdrawal = 1; // withdraw 1 wei ZUSD
+        const collateralAmount = dec(20000, 'ether'); // Increase collateral
+
+        await assertRevert(borrowerOperationsCrossReentrancy.testCrossReentrancyByIncreasingDebt(
+          th._100pct,
+          ZUSDwithdrawal,
+          borrowerOperationsCrossReentrancy.address,
+          borrowerOperationsCrossReentrancy.address,
+          priceFeed.address,
+          {from: whale, value: collateralAmount}), "Recovery mode mutex locked. Try in another block")
+        });
     });
 
     if (!withProxy) {
