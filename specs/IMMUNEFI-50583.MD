@@ -232,3 +232,41 @@ Final Summary
    • Add `require(address(collSurplusPool) != address(0))`, etc., before each critical use.  
 
 If these safeguards are not implemented, the system will continue to allow involuntary burning, but **there is no legitimate use case where burning ETH is necessary** according to the current contract logic.
+
+---
+
+**User**
+
+Context: @README.md
+Identify if there is any design reason for leaving the `ActivePool.sendETH` function without a protection like `require(_account != address(0), "ActivePool: zero address")`
+
+---
+
+**Cursor**
+
+There is no functional reason (described in the README or the rest of the documentation) that requires "burning" RBTC by sending it to `address(0)`.
+The value flow specified in "Flow of RBTC in Zero" (lines 343-376 of the README) lists **all** possible routes and in no case does the zero address appear as a destination.
+
+Why the explicit verification was not included in `ActivePool.sendETH`:
+
+1. "Previous barriers"
+   • `sendETH` can only be called by `BorrowerOperations`, `TroveManager` or `StabilityPool` (function `_requireCallerIsBOorTroveMorSP`).
+   • Each of these contracts, in turn, only passes addresses coming from:
+      – Parameters set with `setAddresses()` validated with `checkContract` (revert if `codeSize == 0`, i.e., if the address is `0x0` or an EOA).
+      – `msg.sender`, which can never be `0x0`.
+      – `_borrower` or `_liquidator`, extracted from the sorted list or from `msg.sender`, equally impossible to be `0x0`.
+
+   With these filters, there is no execution path that reaches `sendETH(address(0), …)`.
+
+2. Consistency with original Liquity source code
+   The Liquity `ActivePool` contract also doesn't have this check; Zero maintains the same logic.
+
+3. Gas savings
+   Adding a `require(_account != address(0))` would increase ~200 gas per call.
+   Since it's impossible to reach the unsafe route, the authors consider it unnecessary gas.
+
+4. Policy of "blocking" only where there is real risk
+   The README explains that the ZUSD token **does** block transfers to `address(0)` and certain contracts, because users can call `transfer()` to any destination.
+   For RBTC, all outputs are internally controlled by the contracts, so they rely on the logical guarantees described above.
+
+In conclusion, the omission of the verification is not because there is a need to allow sends to `address(0)`, but because the system design prevents that situation from occurring. Adding it would be merely defensive and with gas cost; the authors chose not to include it to maintain parity with Liquity and because they considered that the previous validations are sufficient.
