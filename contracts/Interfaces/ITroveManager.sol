@@ -17,7 +17,7 @@ interface ITroveManager is ILiquityBase {
 
     event FeeDistributorAddressChanged(address _feeDistributorAddress);
     event TroveManagerRedeemOpsAddressChanged(address _troveManagerRedeemOps);
-    event LiquityBaseParamsAddressChanges(address _borrowerOperationsAddress);
+    event LiquityBaseParamsAddressChanges(address _newLiquityBaseParamsAddress);
     event BorrowerOperationsAddressChanged(address _newBorrowerOperationsAddress);
     event PriceFeedAddressChanged(address _newPriceFeedAddress);
     event ZUSDTokenAddressChanged(address _newZUSDTokenAddress);
