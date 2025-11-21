@@ -37,6 +37,7 @@
     "coveralls": "cat coverage/lcov.info | coveralls",
     "hh:fork-testnet": "yarn hardhat node --fork https://testnet.sovryn.app/rpc --no-deploy",
     "hh:fork-mainnet": "yarn hardhat node --fork https://mainnet-dev.sovryn.app/rpc --no-deploy",
+    "hh:fork-mainnet-2": "yarn hardhat node --fork https://mainnet.sovryn.app/rpc --no-deploy",
     "hh:console-mainnet": "hardhat console --network rskSovrynMainnet",
     "hh:console-testnet": "hardhat console --network rskSovrynTestnet"
   },

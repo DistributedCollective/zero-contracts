@@ -1,0 +1,93 @@
+ubuntu@ip-10-0-12-30:~/SOVRYN/ZCONTRACTS$ hh test tests-onchain/test-redemption.test.ts --network rskForkedMainnet
+
+
+  ZUSD Redemption Test
+Using existing forked network at block: 8231867
+Note: Network is already forked. To fork 100 blocks before latest, restart hardhat node with: --fork-block-number <block>
+
+=== Verifying On-Chain Contract Addresses ===
+BorrowerOperations: 0x5B9dB4B8bdeF3e57323187a9AC2639C5DEe5FD39
+  Expected (from deployment files): 0x5B9dB4B8bdeF3e57323187a9AC2639C5DEe5FD39
+  Match: true
+TroveManager: 0x82B09695ee4F214f3A0803683C4AaEc332E4E0a3
+  Expected (from deployment files): 0x82B09695ee4F214f3A0803683C4AaEc332E4E0a3
+  Match: true
+HintHelpers: 0x1D7DaC5a63A35540bE9e031212ecf39584AE5595
+SortedTroves: 0xdeEB95480B94f9395514Fe35CAF692A1C788DfE9
+PriceFeed: 0x6D1d9574d67e04cf35Fa1d916F763eDDae03b75d
+ZUSDToken: 0xdB107FA69E33f05180a4C2cE9c2E7CB481645C2d
+LiquityBaseParams: 0xf8B04A36c36d5DbD1a9Fe7B74897c609d6A17aa2
+==============================================
+
+Current rBTC price: $84834.00
+Current rBTC price (raw): 84834000000000000000000
+Current borrowing rate: 5.0991%
+Using collateral: 1.5 rBTC
+
+=== Line of Credit Setup ===
+Deployer rBTC balance before opening trove: 20.0 rBTC
+Estimated NICR: 1482213438735177
+Opening trove with hints: upper=0xb22FEB9fF21113B6f6480A561637151aBFfa7A04, lower=0x0000000000000000000000000000000000000000
+Using max fee percentage: 100% (to avoid fee slippage issues)
+Waiting for openTrove transaction to be mined...
+Trove opened successfully
+Deployer rBTC balance after opening trove: 18.499895667662 rBTC
+rBTC used as collateral: 1.5 rBTC
+rBTC used for gas: 0.000104332338 rBTC
+Total rBTC spent: 1.500104332338 rBTC
+ZUSD balance after opening trove: 100000.0 ZUSD
+Waiting for transfer transaction to be mined...
+Transferred 100000.0 ZUSD to redeemer account
+Redeemer ZUSD balance: 100000.0 ZUSD
+Redemption price: 84834000000000000000000
+First redemption hint: 0x41875c8CA8C57D0A42A3D407Ee50923d666F0F99
+Partial redemption hint NICR: 6364059364921528
+Truncated ZUSD amount: 100000.0 ZUSD
+Partial redemption hints: upper=0xCA7e65520263EEB72676ce828464bf0a6eE9381B, lower=0xa7f45Bf5ca8D4e2cdC4C60956dc357826e06B02C
+Redeemer rBTC balance before: 5.0 rBTC
+Using max redemption fee: 100% (to avoid fee slippage issues)
+Initiating redemption transaction (this may take a while due to trove iterations)...
+Redemption transaction sent, waiting for confirmation...
+Redemption transaction completed
+
+=== Parsing Redemption Events ===
+Redemption event parsed successfully:
+  Attempted ZUSD amount: 100000.0 ZUSD
+  Actual ZUSD amount redeemed: 100000.0 ZUSD
+  Total rBTC drawn from system: 1.178772661904425112 rBTC
+  Redemption fee (rBTC): 0.027632263092712971 rBTC
+
+BaseRateUpdated event parsed:
+  New base rate: 1.344155%
+  (Base rate is used in redemption fee calculation)
+
+Fee Breakdown:
+  rBTC sent to redeemer: 1.151140398811712141 rBTC
+  Redemption fee percentage: 2.3442%
+
+=== Balance Changes ===
+Redeemer ZUSD balance before: 100000.0 ZUSD
+Redeemer ZUSD balance after: 0.0 ZUSD
+ZUSD burned: 100000.0 ZUSD
+Redeemer rBTC balance before: 5.0 rBTC
+Redeemer rBTC balance after: 6.151109239617712141 rBTC
+rBTC received from redemption (net, after gas): 1.151140398811712141 rBTC
+Gas used (rBTC): 0.000031159194 rBTC
+
+=== Redemption Test Summary ===
+ZUSD attempted to redeem: 100000.0 ZUSD
+ZUSD actually redeemed: 100000.0 ZUSD
+Total rBTC drawn from system: 1.178772661904425112 rBTC
+Redemption fee paid (rBTC): 0.027632263092712971 rBTC
+rBTC sent to redeemer: 1.151140398811712141 rBTC
+Redemption fee percentage: 2.3442%
+Gas cost (rBTC): 0.000031159194 rBTC
+Net rBTC received (after gas): 1.151140398811712141 rBTC
+Effective exchange rate: 86870.376631058221792444 ZUSD per rBTC
+Effective exchange rate (inverse): 0.000011511403988117 rBTC per ZUSD
+    ✔ Should create a line of credit, transfer ZUSD, and redeem it for rBTC (239334ms)
+
+
+  1 passing (4m)
+
+ubuntu@ip-10-0-12-30:~/SOVRYN/ZCONTRACTS$ 

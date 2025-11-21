@@ -286,7 +286,7 @@ const config: HardhatUserConfig = {
             blockGasLimit: 6800000,
             live: true,
             tags: ["mainnet", "forked"],
-            timeout: 100000,
+            timeout: 600000, // Increased to 600 seconds (10 minutes) for complex redemption operations
         },
         rskMainnet: {
             url: "https://public-node.rsk.co/",
