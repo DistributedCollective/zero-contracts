@@ -16,6 +16,7 @@ import "./Dependencies/console.sol";
 import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
 import "./Interfaces/IPermit2.sol";
+import "./Interfaces/IRedemptionBuffer.sol";
 
 contract BorrowerOperations is
     LiquityBase,
@@ -164,6 +165,14 @@ contract BorrowerOperations is
         emit MassetManagerAddressChanged(_massetManagerAddress);
     }
 
+    function setRedemptionBuffer(address _buffer, uint256 _rate) external onlyOwner {
+        require(_buffer != address(0), "BorrowerOps: zero buffer address");
+        require(_rate <= DECIMAL_PRECISION, "BorrowerOps: rate > 100%");
+
+        redemptionBuffer = IRedemptionBuffer(_buffer);
+        redemptionBufferRate = _rate;
+    }
+
     function openTrove(
         uint256 _maxFeePercentage,
         uint256 _ZUSDAmount,
@@ -200,6 +209,15 @@ contract BorrowerOperations is
         ContractsCache memory contractsCache = ContractsCache(troveManager, activePool, zusdToken);
         LocalVariables_openTrove memory vars;
 
+        // --- NEW: split collateral between ActivePool and RedemptionBuffer ---
+
+        uint256 collSent = msg.value;
+
+        uint256 bufferShare = collSent.mul(redemptionBufferRate).div(DECIMAL_PRECISION);
+        uint256 activeColl = collSent.sub(bufferShare);
+
+        require(activeColl > 0, "BorrowerOps: active collateral must be > 0");
+
         vars.price = priceFeed.fetchPrice();
         bool isRecoveryMode = _checkRecoveryMode(vars.price);
 
@@ -224,15 +242,17 @@ contract BorrowerOperations is
         vars.compositeDebt = _getCompositeDebt(vars.netDebt);
         assert(vars.compositeDebt > 0);
 
-        vars.ICR = LiquityMath._computeCR(msg.value, vars.compositeDebt, vars.price);
-        vars.NICR = LiquityMath._computeNominalCR(msg.value, vars.compositeDebt);
+        // --- CHANGED: use activeColl instead of msg.value ---
+
+        vars.ICR = LiquityMath._computeCR(activeColl, vars.compositeDebt, vars.price);
+        vars.NICR = LiquityMath._computeNominalCR(activeColl, vars.compositeDebt);
 
         if (isRecoveryMode) {
             _requireICRisAboveCCR(vars.ICR);
         } else {
             _requireICRisAboveMCR(vars.ICR);
             uint256 newTCR = _getNewTCRFromTroveChange(
-                msg.value,
+                activeColl,
                 true,
                 vars.compositeDebt,
                 true,
@@ -241,9 +261,9 @@ contract BorrowerOperations is
             _requireNewTCRisAboveCCR(newTCR);
         }
 
-        // Set the trove struct's properties
+        // Set the trove struct's properties (using activeColl)
         contractsCache.troveManager.setTroveStatus(msg.sender, 1);
-        contractsCache.troveManager.increaseTroveColl(msg.sender, msg.value);
+        contractsCache.troveManager.increaseTroveColl(msg.sender, activeColl);
         contractsCache.troveManager.increaseTroveDebt(msg.sender, vars.compositeDebt);
 
         contractsCache.troveManager.updateTroveRewardSnapshots(msg.sender);
@@ -253,8 +273,16 @@ contract BorrowerOperations is
         vars.arrayIndex = contractsCache.troveManager.addTroveOwnerToArray(msg.sender);
         emit TroveCreated(msg.sender, vars.arrayIndex);
 
-        // Move the ether to the Active Pool, and mint the ZUSDAmount to the borrower
-        _activePoolAddColl(contractsCache.activePool, msg.value);
+        // Move the active collateral to the Active Pool
+        _activePoolAddColl(contractsCache.activePool, activeColl);
+
+        // NEW: send bufferShare to RedemptionBuffer
+        if (bufferShare > 0) {
+            require(address(redemptionBuffer) != address(0), "BorrowerOps: redemption buffer not set");
+            redemptionBuffer.deposit{ value: bufferShare }();
+        }
+
+        // Mint the ZUSDAmount to the borrower and gas comp to the Gas Pool
         _mintZusdAndIncreaseActivePoolDebt(
             contractsCache.activePool,
             contractsCache.zusdToken,
@@ -262,7 +290,6 @@ contract BorrowerOperations is
             _ZUSDAmount,
             vars.netDebt
         );
-        // Move the ZUSD gas compensation to the Gas Pool
         _mintZusdAndIncreaseActivePoolDebt(
             contractsCache.activePool,
             contractsCache.zusdToken,
@@ -274,7 +301,7 @@ contract BorrowerOperations is
         emit TroveUpdated(
             msg.sender,
             vars.compositeDebt,
-            msg.value,
+            activeColl,
             vars.stake,
             BorrowerOperation.openTrove
         );

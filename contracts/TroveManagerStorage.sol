@@ -12,6 +12,7 @@ import "./Interfaces/IFeeDistributor.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/BaseMath.sol";
 import "./Dependencies/console.sol";
+import "./Interfaces/IRedemptionBuffer.sol";
 
 contract TroveManagerStorage is Ownable, BaseMath {
     string public constant NAME = "TroveManager";
@@ -99,4 +100,7 @@ contract TroveManagerStorage is Ownable, BaseMath {
     // Error trackers for the trove redistribution calculation
     uint256 public lastETHError_Redistribution;
     uint256 public lastZUSDDebtError_Redistribution;
+
+    // Redemption buffer used to serve ZUSD redemptions before touching troves
+    IRedemptionBuffer internal redemptionBuffer;
 }

@@ -92,7 +92,15 @@ contract TroveManagerRedeemOps is TroveManagerBase {
         // Confirm redeemer's balance is less than total ZUSD supply
         assert(contractsCache.zusdToken.balanceOf(msg.sender) <= totals.totalZUSDSupplyAtStart);
 
-        totals.remainingZUSD = _ZUSDamount;
+        // --- Use RedemptionBuffer first, before touching troves ---
+        uint256 ethFromBuffer;
+        (totals.remainingZUSD, ethFromBuffer) = _redeemFromBuffer(
+            contractsCache,
+            _ZUSDamount,
+            totals.price,
+            msg.sender
+        );
+
         address currentBorrower;
 
         if (
@@ -139,7 +147,7 @@ contract TroveManagerRedeemOps is TroveManagerBase {
                 _partialRedemptionHintNICR
             );
 
-            if (singleRedemption.cancelledPartial) break; // Partial redemption was cancelled (out-of-date hint, or new net debt < minimum), therefore we could not redeem from the last Trove
+            if (singleRedemption.cancelledPartial) break; // Partial redemption was cancelled
 
             totals.totalZUSDToRedeem = totals.totalZUSDToRedeem.add(singleRedemption.ZUSDLot);
             totals.totalETHDrawn = totals.totalETHDrawn.add(singleRedemption.ETHLot);
@@ -147,39 +155,55 @@ contract TroveManagerRedeemOps is TroveManagerBase {
             totals.remainingZUSD = totals.remainingZUSD.sub(singleRedemption.ZUSDLot);
             currentBorrower = nextUserToCheck;
         }
-        require(totals.totalETHDrawn > 0, "TroveManager: Unable to redeem any amount");
 
-        // Decay the baseRate due to time passed, and then increase it according to the size of this redemption.
+        // total ETH redeemed = from buffer + from troves
+        uint256 totalETHDrawnInclBuffer = totals.totalETHDrawn.add(ethFromBuffer);
+
+        // Require that *some* redemption actually happened (buffer or troves)
+        require(totalETHDrawnInclBuffer > 0, "TroveManager: Unable to redeem any amount");
+
+        // Decay the baseRate and then increase it according to the size of this redemption.
         // Use the saved total ZUSD supply value, from before it was reduced by the redemption.
         _updateBaseRateFromRedemption(
-            totals.totalETHDrawn,
+            totalETHDrawnInclBuffer,
             totals.price,
             totals.totalZUSDSupplyAtStart
         );
 
-        // Calculate the ETH fee
+        // Calculate the ETH fee - only on trove-sourced ETH (buffer part can be fee-free)
         totals.ETHFee = _getRedemptionFee(totals.totalETHDrawn);
 
-        _requireUserAcceptsFee(totals.ETHFee, totals.totalETHDrawn, _maxFeePercentage);
+        // User cares about total ETH they receive vs fee
+        _requireUserAcceptsFee(totals.ETHFee, totalETHDrawnInclBuffer, _maxFeePercentage);
 
         // Send the ETH fee to the feeDistributorContract address
-        contractsCache.activePool.sendETH(address(feeDistributor), totals.ETHFee);
-        feeDistributor.distributeFees();
+        if (totals.ETHFee > 0) {
+            contractsCache.activePool.sendETH(address(feeDistributor), totals.ETHFee);
+            feeDistributor.distributeFees();
+        }
 
+        // ETH from ActivePool (troves) that goes to redeemer, after fee
         totals.ETHToSendToRedeemer = totals.totalETHDrawn.sub(totals.ETHFee);
+
+        // Total ZUSD cancelled (buffer + troves) = initial requested - remaining
+        uint256 totalZUSDCancelled = _ZUSDamount.sub(totals.remainingZUSD);
 
         emit Redemption(
             _ZUSDamount,
-            totals.totalZUSDToRedeem,
-            totals.totalETHDrawn,
+            totalZUSDCancelled,
+            totalETHDrawnInclBuffer,
             totals.ETHFee
         );
 
-        // Burn the total ZUSD that is cancelled with debt, and send the redeemed ETH to msg.sender
-        contractsCache.zusdToken.burn(msg.sender, totals.totalZUSDToRedeem);
-        // Update Active Pool ZUSD, and send ETH to account
-        contractsCache.activePool.decreaseZUSDDebt(totals.totalZUSDToRedeem);
-        contractsCache.activePool.sendETH(msg.sender, totals.ETHToSendToRedeemer);
+        // Burn the ZUSD that is cancelled with trove debt, and send the *trove* ETH to msg.sender
+        if (totals.totalZUSDToRedeem > 0) {
+            contractsCache.zusdToken.burn(msg.sender, totals.totalZUSDToRedeem);
+            contractsCache.activePool.decreaseZUSDDebt(totals.totalZUSDToRedeem);
+        }
+        // ETH from ActivePool → redeemer (buffer ETH already sent earlier)
+        if (totals.ETHToSendToRedeemer > 0) {
+            contractsCache.activePool.sendETH(msg.sender, totals.ETHToSendToRedeemer);
+        }
     }
 
     ///DLLR _owner can use Sovryn Mynt to convert DLLR to ZUSD, then use the Zero redemption mechanism to redeem ZUSD for RBTC, all in a single transaction
@@ -257,6 +281,65 @@ contract TroveManagerRedeemOps is TroveManagerBase {
         address nextTrove = _sortedTroves.getNext(_firstRedemptionHint);
         return
             nextTrove == address(0) || _getCurrentICR(nextTrove, _price) < liquityBaseParams.MCR();
+    }
+
+    /**
+     * @dev Try to satisfy part of a ZUSD redemption using the RedemptionBuffer.
+     *      Burns ZUSD from the redeemer and decreases system ZUSD debt, while
+     *      sending RBTC from the RedemptionBuffer to the redeemer.
+     *
+     * @param _contractsCache ActivePool + ZUSD token cache.
+     * @param _ZUSDAmount     Total ZUSD the user requested to redeem.
+     * @param _price          RBTC price (1e18 precision).
+     * @param _redeemer       Address of the redeemer.
+     *
+     * @return remainingZUSD  ZUSD left to redeem via troves
+     * @return ethFromBuffer  RBTC amount sent from buffer to redeemer
+     */
+    function _redeemFromBuffer(
+        ContractsCache memory _contractsCache,
+        uint256 _ZUSDAmount,
+        uint256 _price,
+        address _redeemer
+    ) internal returns (uint256 remainingZUSD, uint256 ethFromBuffer) {
+        remainingZUSD = _ZUSDAmount;
+
+        // If buffer is not configured or amount is zero, do nothing
+        if (address(redemptionBuffer) == address(0) || _ZUSDAmount == 0) {
+            return (remainingZUSD, 0);
+        }
+
+        uint256 bufferBal = redemptionBuffer.getBalance();
+        if (bufferBal == 0) {
+            return (remainingZUSD, 0);
+        }
+
+        // RBTC needed if the *entire* ZUSD amount was redeemed from this buffer
+        uint256 collNeededForFull = _ZUSDAmount.mul(DECIMAL_PRECISION).div(_price);
+
+        uint256 collFromBuffer = collNeededForFull <= bufferBal
+            ? collNeededForFull
+            : bufferBal;
+
+        // Corresponding ZUSD to burn, priced at the oracle price
+        uint256 zusdToBurn = collFromBuffer.mul(_price).div(DECIMAL_PRECISION);
+        if (zusdToBurn > remainingZUSD) {
+            zusdToBurn = remainingZUSD;
+        }
+
+        if (zusdToBurn == 0) {
+            return (remainingZUSD, 0);
+        }
+
+        // Burn ZUSD from redeemer and adjust system debt
+        _contractsCache.activePool.decreaseZUSDDebt(zusdToBurn);
+        _contractsCache.zusdToken.burn(_redeemer, zusdToBurn);
+
+        // Send RBTC from buffer to redeemer
+        redemptionBuffer.withdrawForRedemption(payable(_redeemer), collFromBuffer);
+
+        remainingZUSD = remainingZUSD.sub(zusdToBurn);
+        ethFromBuffer = collFromBuffer;
     }
 
     /// Redeem as much collateral as possible from _borrower's Trove in exchange for ZUSD up to _maxZUSDamount

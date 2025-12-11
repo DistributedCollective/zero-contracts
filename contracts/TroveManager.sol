@@ -17,6 +17,7 @@ import "./Dependencies/console.sol";
 import "./Dependencies/TroveManagerBase.sol";
 import "./TroveManagerStorage.sol";
 import "./Interfaces/IPermit2.sol";
+import "./Interfaces/IRedemptionBuffer.sol";
 
 contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     /** CONSTANT / IMMUTABLE VARIABLE ONLY */
@@ -115,6 +116,12 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
         checkContract(_troveManagerRedeemOps);
         troveManagerRedeemOps = _troveManagerRedeemOps;
         emit TroveManagerRedeemOpsAddressChanged(_troveManagerRedeemOps);
+    }
+
+    // --- Redemption buffer config ---
+    function setRedemptionBuffer(address _buffer) external onlyOwner {
+        require(_buffer != address(0), "TroveManager: zero buffer address");
+        redemptionBuffer = IRedemptionBuffer(_buffer);
     }
 
     // --- Getters ---
