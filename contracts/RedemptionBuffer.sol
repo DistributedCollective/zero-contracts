@@ -4,17 +4,14 @@ pragma solidity 0.6.11;
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/SafeMath.sol";
 import "./Interfaces/IRedemptionBuffer.sol";
+import "./Interfaces/IFeeDistributor.sol";
 
-/**
- * @dev Holds RBTC collected when Lines of Credit are opened.
- *      TroveManager uses this pool to satisfy ZUSD redemptions before touching troves.
- *      Governance (timelock / Bitocracy) can send excess RBTC to SOV stakers.
- */
 contract RedemptionBuffer is Ownable, IRedemptionBuffer {
     using SafeMath for uint256;
 
     address public borrowerOperations;
     address public troveManager;
+    IFeeDistributor public feeDistributor;
 
     uint256 public totalBufferedColl; // RBTC tracked by this contract
 
@@ -28,10 +25,18 @@ contract RedemptionBuffer is Ownable, IRedemptionBuffer {
         _;
     }
 
-    function setAddresses(address _borrowerOps, address _troveManager) external onlyOwner {
-        require(_borrowerOps != address(0) && _troveManager != address(0), "RB: zero address");
+    function setAddresses(
+        address _borrowerOps,
+        address _troveManager,
+        address _feeDistributor
+    ) external onlyOwner {
+        require(_borrowerOps != address(0), "RB: zero borrowerOps");
+        require(_troveManager != address(0), "RB: zero troveManager");
+        require(_feeDistributor != address(0), "RB: zero feeDistributor");
+
         borrowerOperations = _borrowerOps;
         troveManager = _troveManager;
+        feeDistributor = IFeeDistributor(_feeDistributor);
     }
 
     /// @dev Receives RBTC from BorrowerOperations when a user opens a Line of Credit.
@@ -53,26 +58,23 @@ contract RedemptionBuffer is Ownable, IRedemptionBuffer {
         require(success, "RB: send failed");
     }
 
-    /// @dev Governance-controlled drain of RBTC from the buffer to SOV stakers.
-    function distributeToStakers(address payable _stakingContract, uint256 _amount)
-        external
-        override
-        onlyOwner
-    {
-        require(_stakingContract != address(0), "RB: zero staking address");
+    /// @dev Governance-controlled: send RBTC to FeeDistributor so it’s split like other ZERO fees.
+    function distributeToStakers(uint256 _amount) external override onlyOwner {
+        require(address(feeDistributor) != address(0), "RB: feeDistributor not set");
         require(_amount <= totalBufferedColl, "RB: insufficient buffer");
 
         totalBufferedColl = totalBufferedColl.sub(_amount);
 
-        (bool success, ) = _stakingContract.call{ value: _amount }("");
-        require(success, "RB: staking send failed");
+        // Same pattern as TroveManagerRedeemOps
+        (bool success, ) = address(feeDistributor).call{ value: _amount }("");
+        require(success, "RB: send to feeDistributor failed");
+
+        feeDistributor.distributeFees();
     }
 
-    /// @dev Returns the tracked RBTC balance of the buffer.
     function getBalance() external view override returns (uint256) {
         return totalBufferedColl;
     }
 
-    // Accept stray RBTC (e.g. selfdestruct), but do not count it in totalBufferedColl
     receive() external payable {}
 }

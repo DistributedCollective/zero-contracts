@@ -11,7 +11,7 @@ interface IRedemptionBuffer {
 
     /// @notice Governance-controlled distribution of RBTC to SOV stakers
     /// @dev Only callable by the contract owner (timelock / Bitocracy executor)
-    function distributeToStakers(address payable _stakingContract, uint256 _amount) external;
+    function distributeToStakers(uint256 _amount) external;
 
     /// @return Current RBTC balance tracked by the buffer
     function getBalance() external view returns (uint256);
