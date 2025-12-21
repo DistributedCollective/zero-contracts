@@ -4,6 +4,7 @@ pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
 import "../Dependencies/Mynt/IMassetManager.sol";
+import "./IRedemptionBuffer.sol";
 import { IPermit2, ISignatureTransfer } from "./IPermit2.sol";
 
 /// Common interface for the Trove Manager.
@@ -21,6 +22,10 @@ interface IBorrowerOperations {
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
     event ZUSDTokenAddressChanged(address _zusdTokenAddress);
     event ZEROStakingAddressChanged(address _zeroStakingAddress);
+    /// @notice Emitted when the RedemptionBuffer contract address is updated
+    event RedemptionBufferAddressChanged(address _redemptionBufferAddress);
+    /// @notice Emitted when the redemption buffer rate is updated
+    event RedemptionBufferRateChanged(uint256 _redemptionBufferRate);
 
     event TroveCreated(address indexed _borrower, uint256 arrayIndex);
     event TroveUpdated(
@@ -64,6 +69,42 @@ interface IBorrowerOperations {
         address _zusdTokenAddress,
         address _zeroStakingAddress
     ) external;
+
+        /**
+     * @notice Sets the RedemptionBuffer contract address.
+     * @dev Callable only by owner (governance). The buffer receives RBTC fees when opening troves and is used
+     *      to serve redemptions before touching troves.
+     * @param _buffer RedemptionBuffer contract address
+     */
+    function setRedemptionBuffer(address _buffer) external;
+
+    /**
+     * @notice Sets the redemption buffer rate used to calculate the RBTC fee-on-top when opening a trove.
+     * @dev Callable only by owner (governance). Rate uses 1e18 precision where 1e18 == 100%.
+     * @param _rate Redemption buffer rate (1e18 precision)
+     */
+    function setRedemptionBufferRate(uint256 _rate) external;
+
+    /**
+     * @notice Returns the configured RedemptionBuffer contract address.
+     * @return RedemptionBuffer contract address
+     */
+    function getRedemptionBuffer() external view returns (address);
+
+    /**
+     * @notice Returns the configured redemption buffer rate (1e18 precision).
+     * @return Redemption buffer rate (1e18 precision)
+     */
+    function getRedemptionBufferRate() external view returns (uint256);
+
+    /**
+     * @notice Quotes the extra RBTC (in wei) required on top of collateral when opening a trove borrowing `_ZUSDAmount`.
+     * @dev This function is intentionally NOT `view` because it calls `priceFeed.fetchPrice()` in the same way as openTrove.
+     *      Frontends should call this using eth_call / staticcall (no transaction needed).
+     * @param _ZUSDAmount ZUSD amount the borrower wants to receive when opening the trove
+     * @return Extra RBTC amount (wei) that must be added on top of collateral as the redemption buffer fee
+     */
+    function getRedemptionBufferFeeRBTC(uint256 _ZUSDAmount) external returns (uint256);
 
     /**
      * @notice payable function that creates a Trove for the caller with the requested debt, and the Ether received as collateral.
@@ -129,6 +170,7 @@ interface IBorrowerOperations {
      * @notice issues `_amount` of ZUSD from the caller’s Trove to the caller.
      * Executes only if the Trove's collateralization ratio would remain above the minimum, and the resulting total collateralization ratio is above 150%.
      * The borrower has to provide a `_maxFeePercentage` that he/she is willing to accept in case of a fee slippage, i.e. when a redemption transaction is processed first, driving up the issuance fee.
+     * When increasing debt and redemptionBufferRate > 0, caller must send msg.value at least equal to the redemption buffer fee; quote via getRedemptionBufferFeeRBTC().
      * @param _maxFee max fee percentage to acept in case of a fee slippage
      * @param _amount ZUSD amount to withdraw
      * @param _upperHint upper trove id hint
@@ -139,15 +181,16 @@ interface IBorrowerOperations {
         uint256 _amount,
         address _upperHint,
         address _lowerHint
-    ) external;
+    ) external payable;
 
     /// Borrow (withdraw) ZUSD tokens from a trove: mint new ZUSD tokens to the owner and convert it to DLLR in one transaction
+    /// When increasing debt and redemptionBufferRate > 0, caller must send msg.value at least equal to the redemption buffer fee; quote via getRedemptionBufferFeeRBTC().
     function withdrawZusdAndConvertToDLLR(
         uint256 _maxFeePercentage,
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external returns (uint256);
+    ) external payable returns (uint256);
 
     /// @notice repay `_amount` of ZUSD to the caller’s Trove, subject to leaving 50 debt in the Trove (which corresponds to the 50 ZUSD gas compensation).
     /// @param _amount ZUSD amount to repay
