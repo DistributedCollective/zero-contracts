@@ -38,6 +38,11 @@ contract TroveManagerBase is LiquityBase, TroveManagerStorage {
         _reentrancyStatus = _NOT_ENTERED;
     }
 
+    modifier requireNotEntered() {
+        require(_reentrancyStatus != _ENTERED, "TroveManager: locked");
+        _;
+    }
+
     /**
       --- Variable container structs for liquidations ---
      
