@@ -9,6 +9,7 @@ import "./Dependencies/SafeMath.sol";
 
 contract FeeDistributor is CheckContract, FeeDistributorStorage, IFeeDistributor {
     using SafeMath for uint256;
+    // --- Events ---
 
     event FeeSharingCollectorAddressChanged(address _feeSharingCollectorAddress);
     event ZeroStakingAddressChanged(address _zeroStakingAddress);
@@ -22,6 +23,8 @@ contract FeeDistributor is CheckContract, FeeDistributorStorage, IFeeDistributor
     event RBTCistributed(uint256 _rbtcDistributedAmount);
 
     event RedemptionBufferAddressChanged(address _redemptionBufferAddress);
+
+    // --- Dependency setters ---
 
     function setAddresses(
         address _feeSharingCollectorAddress,
@@ -111,13 +114,15 @@ contract FeeDistributor is CheckContract, FeeDistributorStorage, IFeeDistributor
     }
 
     function _distributeZUSD(uint256 toDistribute) internal {
+        // Send fee to the FeeSharingCollector address
         uint256 feeToFeeSharingCollector = toDistribute.mul(FEE_TO_FEE_SHARING_COLLECTOR).div(
             LiquityMath.DECIMAL_PRECISION
         );
-
         zusdToken.approve(address(feeSharingCollector), feeToFeeSharingCollector);
-        feeSharingCollector.transferTokens(address(zusdToken), uint96(feeToFeeSharingCollector));
 
+        feeSharingCollector.transferTokens(address(zusdToken), uint96(feeToFeeSharingCollector));
+        
+        // Send fee to ZERO staking contract
         uint256 feeToZeroStaking = toDistribute.sub(feeToFeeSharingCollector);
         if (feeToZeroStaking != 0) {
             require(
@@ -126,24 +131,24 @@ contract FeeDistributor is CheckContract, FeeDistributorStorage, IFeeDistributor
             );
             zeroStaking.increaseF_ZUSD(feeToZeroStaking);
         }
-
         emit ZUSDDistributed(toDistribute);
     }
 
     function _distributeRBTC(uint256 toDistribute) internal {
+        // Send fee to the feeSharingCollector address
         uint256 feeToFeeSharingCollector = toDistribute.mul(FEE_TO_FEE_SHARING_COLLECTOR).div(
             LiquityMath.DECIMAL_PRECISION
         );
 
         feeSharingCollector.transferRBTC{ value: feeToFeeSharingCollector }();
 
+        // Send the ETH fee to the ZERO staking contract
         uint256 feeToZeroStaking = toDistribute.sub(feeToFeeSharingCollector);
         if (feeToZeroStaking != 0) {
             (bool success, ) = address(zeroStaking).call{ value: feeToZeroStaking }("");
             require(success, "FeeDistributor: sending ETH failed");
             zeroStaking.increaseF_ETH(feeToZeroStaking);
         }
-
         emit RBTCistributed(toDistribute);
     }
 
