@@ -27,6 +27,19 @@ contract BorrowerOperations is
     /** CONSTANT / IMMUTABLE VARIABLE ONLY */
     IPermit2 public immutable permit2;
 
+    // ---------------------------------------------------------------------
+    // Reentrancy guard
+    // ---------------------------------------------------------------------
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+
+    modifier nonReentrant() {
+        require(_reentrancyStatus != _ENTERED, "BorrowerOps: reentrant call");
+        _reentrancyStatus = _ENTERED;
+        _;
+        _reentrancyStatus = _NOT_ENTERED;
+    }
+
     /* --- Variable container structs  ---
 
     Used to hold, return and assign variables inside a function, in order to avoid the error:
@@ -101,6 +114,7 @@ contract BorrowerOperations is
     /** Constructor */
     constructor(address _permit2) public {
         permit2 = IPermit2(_permit2);
+        _reentrancyStatus = _NOT_ENTERED;
     }
 
     // --- Dependency setters ---
@@ -230,7 +244,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         _openTrove(_maxFeePercentage, _ZUSDAmount, _upperHint, _lowerHint, msg.sender);
     }
 
@@ -239,7 +253,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         require(address(massetManager) != address(0), "Masset address not set");
 
         _openTrove(_maxFeePercentage, _ZUSDAmount, _upperHint, _lowerHint, address(this));
@@ -381,7 +395,7 @@ contract BorrowerOperations is
     }
 
     /// Send ETH as collateral to a trove
-    function addColl(address _upperHint, address _lowerHint) external payable override {
+    function addColl(address _upperHint, address _lowerHint) external payable override nonReentrant {
         _adjustTrove(msg.sender, 0, 0, false, _upperHint, _lowerHint, 0);
     }
 
@@ -390,7 +404,7 @@ contract BorrowerOperations is
         address _borrower,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         _requireCallerIsStabilityPool();
         _adjustTrove(_borrower, 0, 0, false, _upperHint, _lowerHint, 0);
     }
@@ -400,7 +414,7 @@ contract BorrowerOperations is
         uint256 _collWithdrawal,
         address _upperHint,
         address _lowerHint
-    ) external override {
+    ) external override nonReentrant {
         _adjustTrove(msg.sender, _collWithdrawal, 0, false, _upperHint, _lowerHint, 0);
     }
 
@@ -410,7 +424,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         _adjustTrove(msg.sender, 0, _ZUSDAmount, true, _upperHint, _lowerHint, _maxFeePercentage);
     }
 
@@ -422,7 +436,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external payable override returns (uint256) {
+    ) external payable override nonReentrant returns (uint256) {
         address thisAddress = address(this);
         uint256 balanceBefore = zusdToken.balanceOf(thisAddress);
 
@@ -451,7 +465,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external override {
+    ) external override nonReentrant {
         _adjustTrove(msg.sender, 0, _ZUSDAmount, false, _upperHint, _lowerHint, 0);
     }
 
@@ -461,7 +475,7 @@ contract BorrowerOperations is
         address _upperHint,
         address _lowerHint,
         IMassetManager.PermitParams calldata _permitParams
-    ) external override {
+    ) external override nonReentrant {
         _adjustNueTrove(0, 0, _dllrAmount, false, _upperHint, _lowerHint, _permitParams);
     }
 
@@ -472,7 +486,7 @@ contract BorrowerOperations is
         address _lowerHint,
         ISignatureTransfer.PermitTransferFrom memory _permit,
         bytes calldata _signature
-    ) external override {
+    ) external override nonReentrant {
         _adjustNueTroveWithPermit2(0, 0, _dllrAmount, false, _upperHint, _lowerHint, _permit, _signature);
     }
 
@@ -483,7 +497,7 @@ contract BorrowerOperations is
         bool _isDebtIncrease,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         _adjustTrove(
             msg.sender,
             _collWithdrawal,
@@ -504,7 +518,7 @@ contract BorrowerOperations is
         address _upperHint,
         address _lowerHint,
         IMassetManager.PermitParams calldata _permitParams
-    ) external payable override {
+    ) external payable override nonReentrant {
         _adjustNueTrove(
             _maxFeePercentage,
             _collWithdrawal,
@@ -526,7 +540,7 @@ contract BorrowerOperations is
         address _lowerHint,
         ISignatureTransfer.PermitTransferFrom memory _permit,
         bytes calldata _signature
-    ) external payable override {
+    ) external payable override nonReentrant {
         _adjustNueTroveWithPermit2(
             _maxFeePercentage,
             _collWithdrawal,
@@ -811,11 +825,11 @@ contract BorrowerOperations is
         }
     }
 
-    function closeTrove() external override {
+    function closeTrove() external override nonReentrant {
         _closeTrove();
     }
 
-    function closeNueTrove(IMassetManager.PermitParams calldata _permitParams) external override {
+    function closeNueTrove(IMassetManager.PermitParams calldata _permitParams) external override nonReentrant {
         require(address(massetManager) != address(0), "Masset address not set");
 
         uint256 debt = troveManager.getTroveDebt(msg.sender);
@@ -829,7 +843,7 @@ contract BorrowerOperations is
         _closeTrove();
     }
 
-    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom memory _permit, bytes calldata _signature) external override {
+    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom memory _permit, bytes calldata _signature) external override nonReentrant {
         require(address(massetManager) != address(0), "Masset address not set");
 
         uint256 debt = troveManager.getTroveDebt(msg.sender);
@@ -894,7 +908,7 @@ contract BorrowerOperations is
     /**
      * Claim remaining collateral from a redemption or from a liquidation with ICR > MCR in Recovery Mode
      */
-    function claimCollateral() external override {
+    function claimCollateral() external override nonReentrant {
         // send ETH from CollSurplus Pool to owner
         collSurplusPool.claimColl(msg.sender);
     }

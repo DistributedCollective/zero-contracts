@@ -140,12 +140,12 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     // --- Trove Liquidation functions ---
 
     /// Single liquidation function. Closes the trove if its ICR is lower than the minimum collateral ratio.
-    function liquidate(address _borrower) external override {
+    function liquidate(address _borrower) external override nonReentrant {
         _requireTroveIsActive(_borrower);
 
         address[] memory borrowers = new address[](1);
         borrowers[0] = _borrower;
-        batchLiquidateTroves(borrowers);
+        _batchLiquidateTroves(borrowers);
     }
 
     // --- Inner single liquidation functions ---
@@ -399,7 +399,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
      * Liquidate a sequence of troves. Closes a maximum number of n under-collateralized Troves,
      * starting from the one with the lowest collateral ratio in the system, and moving upwards
      */
-    function liquidateTroves(uint256 _n) external override {
+    function liquidateTroves(uint256 _n) external override nonReentrant {
         ContractsCache memory contractsCache = ContractsCache(
             activePool,
             defaultPool,
@@ -602,7 +602,11 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     /**
      * Attempt to liquidate a custom list of troves provided by the caller.
      */
-    function batchLiquidateTroves(address[] memory _troveArray) public override {
+    function batchLiquidateTroves(address[] memory _troveArray) public override nonReentrant {
+        _batchLiquidateTroves(_troveArray);
+    }
+
+    function _batchLiquidateTroves(address[] memory _troveArray) internal {
         require(_troveArray.length != 0, "TroveManager: Calldata address array must not be empty");
 
         IActivePool activePoolCached = activePool;
@@ -853,13 +857,13 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
         return NICR;
     }
 
-    function applyPendingRewards(address _borrower) external override {
+    function applyPendingRewards(address _borrower) external override nonReentrant {
         _requireCallerIsBorrowerOperations();
         return _applyPendingRewards(activePool, defaultPool, _borrower);
     }
 
     /// Update borrower's snapshots of L_ETH and L_ZUSDDebt to reflect the current values
-    function updateTroveRewardSnapshots(address _borrower) external override {
+    function updateTroveRewardSnapshots(address _borrower) external override nonReentrant {
         _requireCallerIsBorrowerOperations();
         return _updateTroveRewardSnapshots(_borrower);
     }
@@ -888,12 +892,12 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
         coll = coll.add(pendingETHReward);
     }
 
-    function removeStake(address _borrower) external override {
+    function removeStake(address _borrower) external override nonReentrant {
         _requireCallerIsBorrowerOperations();
         return _removeStake(_borrower);
     }
 
-    function updateStakeAndTotalStakes(address _borrower) external override returns (uint256) {
+    function updateStakeAndTotalStakes(address _borrower) external override nonReentrant returns (uint256) {
         _requireCallerIsBorrowerOperations();
         return _updateStakeAndTotalStakes(_borrower);
     }
@@ -945,7 +949,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
         _activePool.sendETH(address(_defaultPool), _coll);
     }
 
-    function closeTrove(address _borrower) external override {
+    function closeTrove(address _borrower) external override nonReentrant {
         _requireCallerIsBorrowerOperations();
         return _closeTrove(_borrower, Status.closedByOwner);
     }
@@ -974,7 +978,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     }
 
     /// Push the owner's address to the Trove owners list, and record the corresponding array index on the Trove struct
-    function addTroveOwnerToArray(address _borrower) external override returns (uint256 index) {
+    function addTroveOwnerToArray(address _borrower) external override nonReentrant returns (uint256 index) {
         _requireCallerIsBorrowerOperations();
         return _addTroveOwnerToArray(_borrower);
     }
@@ -1066,7 +1070,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     }
 
     /// Updates the baseRate state variable based on time elapsed since the last redemption or ZUSD borrowing operation.
-    function decayBaseRateFromBorrowing() external override {
+    function decayBaseRateFromBorrowing() external override nonReentrant {
         _requireCallerIsBorrowerOperations();
 
         uint256 decayedBaseRate = _calcDecayedBaseRate();
@@ -1100,7 +1104,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
 
     // --- Trove property setters, called by BorrowerOperations ---
 
-    function setTroveStatus(address _borrower, uint256 _num) external override {
+    function setTroveStatus(address _borrower, uint256 _num) external override nonReentrant {
         _requireCallerIsBorrowerOperations();
         Troves[_borrower].status = Status(_num);
     }
@@ -1108,7 +1112,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     function increaseTroveColl(
         address _borrower,
         uint256 _collIncrease
-    ) external override returns (uint256) {
+    ) external override nonReentrant returns (uint256) {
         _requireCallerIsBorrowerOperations();
         uint256 newColl = Troves[_borrower].coll.add(_collIncrease);
         Troves[_borrower].coll = newColl;
@@ -1118,7 +1122,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     function decreaseTroveColl(
         address _borrower,
         uint256 _collDecrease
-    ) external override returns (uint256) {
+    ) external override nonReentrant returns (uint256) {
         _requireCallerIsBorrowerOperations();
         uint256 newColl = Troves[_borrower].coll.sub(_collDecrease);
         Troves[_borrower].coll = newColl;
@@ -1128,7 +1132,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     function increaseTroveDebt(
         address _borrower,
         uint256 _debtIncrease
-    ) external override returns (uint256) {
+    ) external override nonReentrant returns (uint256) {
         _requireCallerIsBorrowerOperations();
         uint256 newDebt = Troves[_borrower].debt.add(_debtIncrease);
         Troves[_borrower].debt = newDebt;
@@ -1138,7 +1142,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     function decreaseTroveDebt(
         address _borrower,
         uint256 _debtDecrease
-    ) external override returns (uint256) {
+    ) external override nonReentrant returns (uint256) {
         _requireCallerIsBorrowerOperations();
         uint256 newDebt = Troves[_borrower].debt.sub(_debtDecrease);
         Troves[_borrower].debt = newDebt;
@@ -1178,7 +1182,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
         uint256 _partialRedemptionHintNICR,
         uint256 _maxIterations,
         uint256 _maxFeePercentage
-    ) external override {
+    ) external override nonReentrant {
         (bool success, bytes memory returndata) = troveManagerRedeemOps.delegatecall(msg.data);
         require(success, string(returndata));
     }
@@ -1195,7 +1199,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
         uint256 _maxIterations,
         uint256 _maxFeePercentage,
         IMassetManager.PermitParams calldata _permitParams
-    ) external override {
+    ) external override nonReentrant {
         (bool success, bytes memory returndata) = troveManagerRedeemOps.delegatecall(msg.data);
         require(success, string(returndata));
     }
@@ -1213,7 +1217,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
         uint256 _maxFeePercentage,
         ISignatureTransfer.PermitTransferFrom memory _permit,
         bytes calldata _signature
-    ) external override {
+    ) external override nonReentrant {
         (bool success, bytes memory returndata) = troveManagerRedeemOps.delegatecall(msg.data);
         require(success, string(returndata));
     }

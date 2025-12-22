@@ -46,4 +46,10 @@ contract BorrowerOperationsStorage is Ownable {
     // Fraction of incoming RBTC sent to the buffer on openTrove.
     // 1e18 == 100%, e.g. 1e17 == 10%.
     uint256 internal redemptionBufferRate;
+
+    // ---------------------------------------------------------------------
+    // Reentrancy guard (BorrowerOperations only)
+    // ---------------------------------------------------------------------
+    // 0 = uninitialized, 1 = not entered, 2 = entered
+    uint256 internal _reentrancyStatus;
 }

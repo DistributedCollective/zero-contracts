@@ -103,4 +103,10 @@ contract TroveManagerStorage is Ownable, BaseMath {
 
     // Redemption buffer used to serve ZUSD redemptions before touching troves
     IRedemptionBuffer internal redemptionBuffer;
+
+    // ---------------------------------------------------------------------
+    // Reentrancy guard (shared across TroveManager + delegatecall modules)
+    // ---------------------------------------------------------------------
+    // 0 = uninitialized, 1 = not entered, 2 = entered
+    uint256 internal _reentrancyStatus;
 }
