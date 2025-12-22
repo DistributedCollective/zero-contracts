@@ -7,7 +7,13 @@ import "../Dependencies/Mynt/IMassetManager.sol";
 import "./IRedemptionBuffer.sol";
 import { IPermit2, ISignatureTransfer } from "./IPermit2.sol";
 
-/// Common interface for the Trove Manager.
+/// @title IBorrowerOperations
+/// @notice External interface for BorrowerOperations (opening/adjusting/closing troves).
+/// @dev
+///  Redemptions are handled by TroveManager/TroveManagerRedeemOps, but BorrowerOperations is
+///  responsible for issuing debt and collecting:
+///   - the normal ZUSD borrowing fee (paid in ZUSD and minted to FeeDistributor)
+///   - the RedemptionBuffer fee (paid in RBTC and deposited into RedemptionBuffer)
 interface IBorrowerOperations {
     // --- Events ---
 
@@ -22,9 +28,11 @@ interface IBorrowerOperations {
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
     event ZUSDTokenAddressChanged(address _zusdTokenAddress);
     event ZEROStakingAddressChanged(address _zeroStakingAddress);
-    /// @notice Emitted when the RedemptionBuffer contract address is updated
+    /// @notice Emitted when the Mynt/mAsset manager is configured.
+    event MassetManagerAddressChanged(address _massetManagerAddress);
+    /// @notice Emitted when the RedemptionBuffer contract address is updated.
     event RedemptionBufferAddressChanged(address _redemptionBufferAddress);
-    /// @notice Emitted when the redemption buffer rate is updated
+    /// @notice Emitted when the redemption buffer rate is updated.
     event RedemptionBufferRateChanged(uint256 _redemptionBufferRate);
 
     event TroveCreated(address indexed _borrower, uint256 arrayIndex);
@@ -70,41 +78,44 @@ interface IBorrowerOperations {
         address _zeroStakingAddress
     ) external;
 
-        /**
-     * @notice Sets the RedemptionBuffer contract address.
-     * @dev Callable only by owner (governance). The buffer receives RBTC fees when opening troves and is used
-     *      to serve redemptions before touching troves.
-     * @param _buffer RedemptionBuffer contract address
-     */
+    /// @notice Sets the Mynt/mAsset manager used for NUE/DLLR flows.
+    /// @dev Owner/governance only in implementation.
+    function setMassetManagerAddress(address _massetManagerAddress) external;
+    
+    // --- RedemptionBuffer configuration ---
+
+    /// @notice Sets the RedemptionBuffer contract address.
+    /// @dev Owner/governance only in implementation.
     function setRedemptionBuffer(address _buffer) external;
 
-    /**
-     * @notice Sets the redemption buffer rate used to calculate the RBTC fee-on-top when opening a trove.
-     * @dev Callable only by owner (governance). Rate uses 1e18 precision where 1e18 == 100%.
-     * @param _rate Redemption buffer rate (1e18 precision)
-     */
+    /// @notice Sets the redemption buffer rate used to compute the RBTC fee.
+    /// @dev 1e18 precision; 1e18 == 100%. Owner/governance only in implementation.
     function setRedemptionBufferRate(uint256 _rate) external;
 
-    /**
-     * @notice Returns the configured RedemptionBuffer contract address.
-     * @return RedemptionBuffer contract address
-     */
+    /// @notice Returns the configured RedemptionBuffer contract address.
     function getRedemptionBuffer() external view returns (address);
 
-    /**
-     * @notice Returns the configured redemption buffer rate (1e18 precision).
-     * @return Redemption buffer rate (1e18 precision)
-     */
+    /// @notice Returns the configured redemption buffer rate (1e18 precision).
     function getRedemptionBufferRate() external view returns (uint256);
 
-    /**
-     * @notice Quotes the extra RBTC (in wei) required on top of collateral when opening a trove borrowing `_ZUSDAmount`.
-     * @dev This function is intentionally NOT `view` because it calls `priceFeed.fetchPrice()` in the same way as openTrove.
-     *      Frontends should call this using eth_call / staticcall (no transaction needed).
-     * @param _ZUSDAmount ZUSD amount the borrower wants to receive when opening the trove
-     * @return Extra RBTC amount (wei) that must be added on top of collateral as the redemption buffer fee
-     */
+    // --- RedemptionBuffer fee quoting ---
+
+    /// @notice Quotes the extra RBTC (wei) required on top of collateral when borrowing `_ZUSDAmount`.
+    /// @dev NOT view in many Liquity forks because priceFeed.fetchPrice() is non-view.
+    ///      Frontends should call via eth_call/staticcall.
     function getRedemptionBufferFeeRBTC(uint256 _ZUSDAmount) external returns (uint256);
+
+    /// @notice View-only quote that uses a caller-supplied price.
+    /// @dev Lets frontends avoid calling BorrowerOperations.getRedemptionBufferFeeRBTC()
+    ///      if they already have a price from elsewhere. The implementation should mirror the
+    ///      exact arithmetic (including rounding) used by openTrove/adjustTrove.
+    /// @param _ZUSDAmount Amount of new ZUSD debt being minted (not including borrowing fee).
+    /// @param _price Oracle price in 1e18 precision (RBTC/USD or RBTC/ZUSD face-value model).
+    /// @return feeRBTC Extra RBTC (wei) required as the redemption buffer fee.
+    function getRedemptionBufferFeeRBTCWithPrice(uint256 _ZUSDAmount, uint256 _price)
+        external
+        view
+        returns (uint256 feeRBTC);
 
     /**
      * @notice payable function that creates a Trove for the caller with the requested debt, and the Ether received as collateral.

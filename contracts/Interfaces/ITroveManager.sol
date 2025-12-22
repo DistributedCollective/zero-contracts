@@ -11,7 +11,12 @@ import "./IZEROStaking.sol";
 import "../Dependencies/Mynt/IMassetManager.sol";
 import { IPermit2, ISignatureTransfer } from "./IPermit2.sol";
 
-/// Common interface for the Trove Manager.
+/// @title ITroveManager
+/// @notice External interface for TroveManager (liquidations/redemptions/system accounting).
+/// @dev
+///  RedemptionBuffer integration:
+///   - TroveManager (via TroveManagerRedeemOps) may pull RBTC out of RedemptionBuffer to
+///     satisfy redemptions and/or pay redemption fees to FeeDistributor.
 interface ITroveManager is ILiquityBase {
     // --- Events ---
 
@@ -105,6 +110,10 @@ interface ITroveManager is ILiquityBase {
     ) external;
 
     function setTroveManagerRedeemOps(address _troveManagerRedeemOps) external;
+
+    /// @notice Configures the RedemptionBuffer contract address used during redemptions.
+    /// @dev Owner/governance only in implementation.
+    function setRedemptionBuffer(address _buffer) external;
 
     /// @return Trove owners count
     function getTroveOwnersCount() external view returns (uint256);

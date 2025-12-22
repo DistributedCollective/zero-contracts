@@ -13,7 +13,7 @@ contract RedemptionBuffer is Ownable, IRedemptionBuffer {
     address public troveManager;
     IFeeDistributor public feeDistributor;
 
-    uint256 public totalBufferedColl; // RBTC tracked by this contract
+    uint256 public totalBufferedColl;
 
     modifier onlyBorrowerOps() {
         require(msg.sender == borrowerOperations, "RB: caller is not BorrowerOperations");
@@ -39,13 +39,11 @@ contract RedemptionBuffer is Ownable, IRedemptionBuffer {
         feeDistributor = IFeeDistributor(_feeDistributor);
     }
 
-    /// @dev Receives RBTC from BorrowerOperations when a user opens a Line of Credit.
     function deposit() external payable override onlyBorrowerOps {
         require(msg.value > 0, "RB: no value");
         totalBufferedColl = totalBufferedColl.add(msg.value);
     }
 
-    /// @dev Used by TroveManager to serve ZUSD redemptions from the buffer.
     function withdrawForRedemption(address payable _to, uint256 _amount)
         external
         override
@@ -58,23 +56,28 @@ contract RedemptionBuffer is Ownable, IRedemptionBuffer {
         require(success, "RB: send failed");
     }
 
-    /// @dev Governance-controlled: send RBTC to FeeDistributor so it’s split like other ZERO fees.
     function distributeToStakers(uint256 _amount) external override onlyOwner {
         require(address(feeDistributor) != address(0), "RB: feeDistributor not set");
         require(_amount <= totalBufferedColl, "RB: insufficient buffer");
 
         totalBufferedColl = totalBufferedColl.sub(_amount);
 
-        // Same pattern as TroveManagerRedeemOps
         (bool success, ) = address(feeDistributor).call{ value: _amount }("");
         require(success, "RB: send to feeDistributor failed");
 
+        // With the FeeDistributor patch above, this can now succeed.
         feeDistributor.distributeFees();
+    }
+
+    function syncBalance() external onlyOwner {
+        totalBufferedColl = address(this).balance;
     }
 
     function getBalance() external view override returns (uint256) {
         return totalBufferedColl;
     }
 
-    receive() external payable {}
+    receive() external payable {
+        totalBufferedColl = totalBufferedColl.add(msg.value);
+    }
 }

@@ -162,13 +162,14 @@ contract BorrowerOperations is
         emit ZEROStakingAddressChanged(_zeroStakingAddress);
     }
 
-    function setMassetManagerAddress(address _massetManagerAddress) external onlyOwner {
+    function setMassetManagerAddress(address _massetManagerAddress) external override onlyOwner {
         massetManager = IMassetManager(_massetManagerAddress);
         emit MassetManagerAddressChanged(_massetManagerAddress);
     }
 
     function setRedemptionBuffer(address _buffer) external override onlyOwner {
         require(_buffer != address(0), "BorrowerOps: zero buffer address");
+        checkContract(_buffer);
         redemptionBuffer = IRedemptionBuffer(_buffer);
         emit RedemptionBufferAddressChanged(_buffer);
     }
@@ -214,6 +215,7 @@ contract BorrowerOperations is
     function getRedemptionBufferFeeRBTCWithPrice(uint256 _ZUSDAmount, uint256 _price)
         external
         view
+        override
         returns (uint256)
     {
         if (redemptionBufferRate == 0) {
@@ -974,6 +976,11 @@ contract BorrowerOperations is
             );
         } else {
             _burnZusdAndDecreaseActivePoolDebt(_activePool, _zusdToken, _borrower, _ZUSDChange);
+        }
+
+        // Prevent 0-value external calls
+        if (_collChange == 0) {
+            return;
         }
 
         if (_isCollIncrease) {
