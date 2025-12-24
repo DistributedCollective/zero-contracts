@@ -86,14 +86,14 @@ interface IBorrowerOperations {
 
     /// @notice Sets the RedemptionBuffer contract address.
     /// @dev Owner/governance only in implementation.
-    function setRedemptionBuffer(address _buffer) external;
+    function setRedemptionBufferAddress(address _buffer) external;
 
     /// @notice Sets the redemption buffer rate used to compute the RBTC fee.
     /// @dev 1e18 precision; 1e18 == 100%. Owner/governance only in implementation.
     function setRedemptionBufferRate(uint256 _rate) external;
 
     /// @notice Returns the configured RedemptionBuffer contract address.
-    function getRedemptionBuffer() external view returns (address);
+    function getRedemptionBufferAddress() external view returns (address);
 
     /// @notice Returns the configured redemption buffer rate (1e18 precision).
     function getRedemptionBufferRate() external view returns (uint256);

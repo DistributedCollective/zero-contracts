@@ -113,7 +113,7 @@ interface ITroveManager is ILiquityBase {
 
     /// @notice Configures the RedemptionBuffer contract address used during redemptions.
     /// @dev Owner/governance only in implementation.
-    function setRedemptionBuffer(address _buffer) external;
+    function setRedemptionBufferAddress(address _buffer) external;
 
     /// @return Trove owners count
     function getTroveOwnersCount() external view returns (uint256);

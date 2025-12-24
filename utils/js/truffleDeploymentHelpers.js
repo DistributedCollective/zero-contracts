@@ -8,6 +8,7 @@ const DefaultPool = artifacts.require("./DefaultPool.sol");
 const StabilityPool = artifacts.require("./StabilityPool.sol")
 const FunctionCaller = artifacts.require("./FunctionCaller.sol")
 const BorrowerOperations = artifacts.require("./BorrowerOperations.sol")
+const RedemptionBuffer = artifacts.require("./RedemptionBuffer.sol")
 const Permit2 = artifacts.require("Permit2");
 
 const deployLiquity = async () => {
@@ -20,6 +21,7 @@ const deployLiquity = async () => {
   const defaultPool = await DefaultPool.new()
   const functionCaller = await FunctionCaller.new()
   const borrowerOperations = await BorrowerOperations.new(permit2.address)
+  const redemptionBuffer = await RedemptionBuffer.new()
   const zusdToken = await ZUSDToken.new()
   await zusdToken.initialize(
     troveManager.address,
@@ -35,6 +37,7 @@ const deployLiquity = async () => {
   StabilityPool.setAsDeployed(stabilityPool)
   FunctionCaller.setAsDeployed(functionCaller)
   BorrowerOperations.setAsDeployed(borrowerOperations)
+  RedemptionBuffer.setAsDeployed(redemptionBuffer)
 
   const contracts = {
     priceFeedTestnet,
@@ -45,7 +48,8 @@ const deployLiquity = async () => {
     stabilityPool,
     defaultPool,
     functionCaller,
-    borrowerOperations
+    borrowerOperations,
+    redemptionBuffer
   }
   return contracts
 }
@@ -60,7 +64,8 @@ const getAddresses = (contracts) => {
     StabilityPool: contracts.stabilityPool.address,
     ActivePool: contracts.activePool.address,
     DefaultPool: contracts.defaultPool.address,
-    FunctionCaller: contracts.functionCaller.address
+    FunctionCaller: contracts.functionCaller.address,
+    RedemptionBuffer: contracts.redemptionBuffer.address
   }
 }
 
@@ -84,6 +89,7 @@ const connectContracts = async (contracts, addresses) => {
   await contracts.troveManager.setDefaultPool(addresses.DefaultPool)
   await contracts.troveManager.setStabilityPool(addresses.StabilityPool)
   await contracts.troveManager.setBorrowerOperations(addresses.BorrowerOperations)
+  await contracts.troveManager.setRedemptionBufferAddress(addresses.RedemptionBuffer)
 
   // set contracts in BorrowerOperations 
   await contracts.borrowerOperations.setSortedTroves(addresses.SortedTroves)
@@ -91,6 +97,7 @@ const connectContracts = async (contracts, addresses) => {
   await contracts.borrowerOperations.setActivePool(addresses.ActivePool)
   await contracts.borrowerOperations.setDefaultPool(addresses.DefaultPool)
   await contracts.borrowerOperations.setTroveManager(addresses.TroveManager)
+  await contracts.borrowerOperations.setRedemptionBufferAddress(addresses.RedemptionBuffer)
 
   // set contracts in the Pools
   await contracts.stabilityPool.setActivePoolAddress(addresses.ActivePool)
@@ -101,6 +108,9 @@ const connectContracts = async (contracts, addresses) => {
 
   await contracts.defaultPool.setStabilityPoolAddress(addresses.StabilityPool)
   await contracts.defaultPool.setActivePoolAddress(addresses.ActivePool)
+
+  await contracts.redemptionBuffer.setTroveManager(addresses.TroveManager)
+  await contracts.redemptionBuffer.setBorrowerOperations(addresses.BorrowerOperations)
 }
 
 const connectEchidnaProxy = async (echidnaProxy, addresses) => {

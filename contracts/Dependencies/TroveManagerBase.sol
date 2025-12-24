@@ -370,6 +370,9 @@ contract TroveManagerBase is LiquityBase, TroveManagerStorage {
         uint256 _redemptionRate,
         uint256 _ETHDrawn
     ) internal pure returns (uint256) {
+        if (_ETHDrawn == 0) {
+            return 0; // This prevents a revert if for instance no eth is drawn from the redemption buffer or no eth is drawn from troves.
+        }
         uint256 redemptionFee = _redemptionRate.mul(_ETHDrawn).div(DECIMAL_PRECISION);
         require(
             redemptionFee < _ETHDrawn,

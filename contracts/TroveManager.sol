@@ -119,7 +119,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     }
 
     // --- Redemption buffer config ---
-    function setRedemptionBuffer(address _buffer) external override onlyOwner {
+    function setRedemptionBufferAddress(address _buffer) external override onlyOwner {
         require(_buffer != address(0), "TroveManager: zero buffer address");
         checkContract(_buffer);
         redemptionBuffer = IRedemptionBuffer(_buffer);

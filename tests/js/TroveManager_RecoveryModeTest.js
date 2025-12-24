@@ -1570,9 +1570,9 @@ contract('TroveManager - in Recovery Mode', async accounts => {
   it("liquidate(): does not alter the liquidated user's token balance", async () => {
     await openTrove({ ICR: toBN(dec(220, 16)), extraZUSDAmount: dec(1000, 18), extraParams: { from: whale } });
 
-    const { zusdAmount: A_zusdAmount } = await openTrove({ ICR: toBN(dec(200, 16)), extraZUSDAmount: dec(300, 18), extraParams: { from: alice } });
-    const { zusdAmount: B_zusdAmount } = await openTrove({ ICR: toBN(dec(200, 16)), extraZUSDAmount: dec(200, 18), extraParams: { from: bob } });
-    const { zusdAmount: C_zusdAmount } = await openTrove({ ICR: toBN(dec(206, 16)), extraZUSDAmount: dec(100, 18), extraParams: { from: carol } });
+    const { requestedZUSDAmount: A_zusdAmount } = await openTrove({ ICR: toBN(dec(200, 16)), extraZUSDAmount: dec(300, 18), extraParams: { from: alice } });
+    const { requestedZUSDAmount: B_zusdAmount } = await openTrove({ ICR: toBN(dec(200, 16)), extraZUSDAmount: dec(200, 18), extraParams: { from: bob } });
+    const { requestedZUSDAmount: C_zusdAmount } = await openTrove({ ICR: toBN(dec(206, 16)), extraZUSDAmount: dec(100, 18), extraParams: { from: carol } });
 
     await priceFeed.setPrice(dec(105, 18));
 
@@ -2470,9 +2470,9 @@ contract('TroveManager - in Recovery Mode', async accounts => {
     await openTrove({ ICR: toBN(dec(300, 16)), extraParams: { from: whale } });
 
     // D, E, F open troves that will fall below MCR when price drops to 100
-    const { zusdAmount: zusdAmountD } = await openTrove({ ICR: toBN(dec(200, 16)), extraParams: { from: dennis } });
-    const { zusdAmount: zusdAmountE } = await openTrove({ ICR: toBN(dec(133, 16)), extraParams: { from: erin } });
-    const { zusdAmount: zusdAmountF } = await openTrove({ ICR: toBN(dec(111, 16)), extraParams: { from: freddy } });
+    const { requestedZUSDAmount: zusdAmountD } = await openTrove({ ICR: toBN(dec(200, 16)), extraParams: { from: dennis } });
+    const { requestedZUSDAmount: zusdAmountE } = await openTrove({ ICR: toBN(dec(133, 16)), extraParams: { from: erin } });
+    const { requestedZUSDAmount: zusdAmountF } = await openTrove({ ICR: toBN(dec(111, 16)), extraParams: { from: freddy } });
 
     // Check list size is 4
     assert.equal((await sortedTroves.getSize()).toString(), '4');
@@ -2507,11 +2507,11 @@ contract('TroveManager - in Recovery Mode', async accounts => {
 
   it("liquidateTroves(): Liquidating troves at 100 < ICR < 110 with SP deposits correctly impacts their SP deposit and ETH gain", async () => {
     // Whale provides ZUSD to the SP
-    const { zusdAmount: W_zusdAmount } = await openTrove({ ICR: toBN(dec(300, 16)), extraZUSDAmount: dec(4000, 18), extraParams: { from: whale } });
+    const { requestedZUSDAmount: W_zusdAmount } = await openTrove({ ICR: toBN(dec(300, 16)), extraZUSDAmount: dec(4000, 18), extraParams: { from: whale } });
     await stabilityPool.provideToSP(W_zusdAmount, ZERO_ADDRESS, { from: whale });
 
-    const { zusdAmount: A_zusdAmount, totalDebt: A_totalDebt, collateral: A_coll } = await openTrove({ ICR: toBN(dec(191, 16)), extraZUSDAmount: dec(40, 18), extraParams: { from: alice } });
-    const { zusdAmount: B_zusdAmount, totalDebt: B_totalDebt, collateral: B_coll } = await openTrove({ ICR: toBN(dec(200, 16)), extraZUSDAmount: dec(240, 18), extraParams: { from: bob } });
+    const { requestedZUSDAmount: A_zusdAmount, totalDebt: A_totalDebt, collateral: A_coll } = await openTrove({ ICR: toBN(dec(191, 16)), extraZUSDAmount: dec(40, 18), extraParams: { from: alice } });
+    const { requestedZUSDAmount: B_zusdAmount, totalDebt: B_totalDebt, collateral: B_coll } = await openTrove({ ICR: toBN(dec(200, 16)), extraZUSDAmount: dec(240, 18), extraParams: { from: bob } });
     const { totalDebt: C_totalDebt, collateral: C_coll } = await openTrove({ ICR: toBN(dec(209, 16)), extraParams: { from: carol } });
 
     // A, B provide to the SP

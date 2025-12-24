@@ -3,6 +3,7 @@ const SortedTroves = artifacts.require("./SortedTroves.sol");
 const LiquityBaseParams = artifacts.require("./LiquityBaseParams.sol");
 const TroveManagerRedeemOps = artifacts.require("./Dependencies/TroveManagerRedeemOps.sol");
 const TroveManager = artifacts.require("./TroveManager.sol");
+const RedemptionBuffer = artifacts.require("./RedemptionBuffer.sol");
 const PriceFeedTestnet = artifacts.require("./PriceFeedTestnet.sol");
 const PriceFeedSovryn = artifacts.require("./PriceFeedSovrynTester.sol");
 const ZUSDToken = artifacts.require("./ZUSDToken.sol");
@@ -107,6 +108,7 @@ class DeploymentHelper {
     const liquityBaseParams = await LiquityBaseParams.new();
     const troveManagerRedeemOps = await TroveManagerRedeemOps.new(TWO_WEEKS, permit2.address);
     const troveManager = await TroveManager.new(TWO_WEEKS, permit2.address);
+    const redemptionBuffer = await RedemptionBuffer.new();
     const activePool = await ActivePool.new();
     const stabilityPool = await StabilityPool.new(permit2.address);
     const gasPool = await GasPool.new();
@@ -132,6 +134,7 @@ class DeploymentHelper {
     LiquityBaseParams.setAsDeployed(liquityBaseParams);
     TroveManagerRedeemOps.setAsDeployed(troveManagerRedeemOps);
     TroveManager.setAsDeployed(troveManager);
+    RedemptionBuffer.setAsDeployed(redemptionBuffer);
     ActivePool.setAsDeployed(activePool);
     StabilityPool.setAsDeployed(stabilityPool);
     GasPool.setAsDeployed(gasPool);
@@ -151,6 +154,7 @@ class DeploymentHelper {
       liquityBaseParams,
       troveManagerRedeemOps,
       troveManager,
+      redemptionBuffer,
       activePool,
       stabilityPool,
       gasPool,
@@ -175,6 +179,7 @@ class DeploymentHelper {
     testerContracts.priceFeedTestnet = await PriceFeedTestnet.new();
     testerContracts.priceFeedSovryn = await PriceFeedSovryn.new();
     testerContracts.sortedTroves = await SortedTroves.new();
+    testerContracts.redemptionBuffer  = await RedemptionBuffer.new();
     // Actual tester contracts
     testerContracts.communityIssuance = await CommunityIssuanceTester.new();
     testerContracts.activePool = await ActivePoolTester.new();
@@ -272,6 +277,7 @@ class DeploymentHelper {
     const liquityBaseParams = await LiquityBaseParams.new();
     const troveManagerRedeemOps = await TroveManagerRedeemOps.new(TWO_WEEKS, permit2.address);
     const troveManager = await TroveManager.new(TWO_WEEKS);
+    const redemptionBuffer = await RedemptionBuffer.new();
     const activePool = await ActivePool.new();
     const stabilityPool = await StabilityPool.new(permit2.address);
     const gasPool = await GasPool.new();
@@ -296,6 +302,7 @@ class DeploymentHelper {
       liquityBaseParams,
       troveManagerRedeemOps,
       troveManager,
+      redemptionBuffer,
       activePool,
       stabilityPool,
       gasPool,
@@ -453,6 +460,7 @@ class DeploymentHelper {
         _zeroStakingAddress: ZEROContracts.zeroStaking.address
       }
     );
+    await contracts.troveManager.setRedemptionBufferAddress(contracts.redemptionBuffer.address);
 
     // set contracts in BorrowerOperations
     await contracts.borrowerOperations.setAddresses(
@@ -469,6 +477,15 @@ class DeploymentHelper {
       contracts.zusdToken.address,
       ZEROContracts.zeroStaking.address
     );
+    await contracts.borrowerOperations.setRedemptionBufferAddress(contracts.redemptionBuffer.address);
+    await contracts.borrowerOperations.setRedemptionBufferRate(web3.utils.toBN('25000000000000000')); // 2.5% in 1e18 precision
+
+    // set contracts in RedemptionBuffer
+    await contracts.redemptionBuffer.setAddresses(
+      contracts.borrowerOperations.address,
+      contracts.troveManager.address,
+      contracts.feeDistributor.address
+    );
 
     // set contracts in FeeDistributor
     await contracts.feeDistributor.setAddresses(
@@ -480,6 +497,7 @@ class DeploymentHelper {
       contracts.zusdToken.address,
       contracts.activePool.address
     );
+    await contracts.feeDistributor.setRedemptionBufferAddress(contracts.redemptionBuffer.address);
 
     // set contracts in the Pools
     await contracts.stabilityPool.setAddresses(

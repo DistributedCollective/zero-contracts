@@ -181,7 +181,7 @@ contract BorrowerOperations is
         emit MassetManagerAddressChanged(_massetManagerAddress);
     }
 
-    function setRedemptionBuffer(address _buffer) external override onlyOwner {
+    function setRedemptionBufferAddress(address _buffer) external override onlyOwner {
         require(_buffer != address(0), "BorrowerOps: zero buffer address");
         checkContract(_buffer);
         redemptionBuffer = IRedemptionBuffer(_buffer);
@@ -198,7 +198,7 @@ contract BorrowerOperations is
     }
 
     /// @notice Returns the configured RedemptionBuffer contract.
-    function getRedemptionBuffer() external view override returns (address) {
+    function getRedemptionBufferAddress() external view override returns (address) {
         return address(redemptionBuffer);
     }
 
