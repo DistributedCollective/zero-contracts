@@ -52,6 +52,24 @@ contract('TroveManager - in Recovery Mode', async accounts => {
   const getNetBorrowingAmount = async (debtWithFee) => th.getNetBorrowingAmount(contracts, debtWithFee);
   const openTrove = async (params) => th.openTrove(contracts, params);
 
+  const emptyRedemptionBufferAsOwner = async () => {
+    const bufferBal = toBN(await contracts.redemptionBuffer.getBalance());
+    if (bufferBal.eq(toBN(0))) return;
+
+    // RedemptionBuffer is Ownable — use its current owner (often `owner` or `multisig`)
+    const rbOwner = await contracts.redemptionBuffer.getOwner();
+
+    await contracts.redemptionBuffer.distributeToStakers(
+      bufferBal,
+      { from: rbOwner, gasPrice: 0 }
+    );
+
+    // sanity
+    const afterBal = toBN(await contracts.redemptionBuffer.getBalance());
+    assert.isTrue(afterBal.eq(toBN(0)), "buffer not fully emptied");
+  };
+
+
   before(async () => {
     contracts = await deploymentHelper.deployLiquityCore();
     contracts.troveManager = await TroveManagerTester.new(contracts.permit2.address);
@@ -1633,7 +1651,7 @@ contract('TroveManager - in Recovery Mode', async accounts => {
     await troveManager.liquidate(bob, { from: owner });
 
     // check Bob’s collateral surplus: 5.76 * 100 - 480 * 1.1
-    const bob_remainingCollateral = B_coll.sub(B_totalDebt.mul(th.toBN(dec(11, 17))).div(price));
+    const bob_remainingCollateral = B_coll.sub(B_totalDebt.mul(toBN(dec(11, 17))).div(price));
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(bob), bob_remainingCollateral);
     // can claim collateral
     const bob_balanceBefore = th.toBN(await web3.eth.getBalance(bob));
@@ -1649,15 +1667,17 @@ contract('TroveManager - in Recovery Mode', async accounts => {
     await priceFeed.setPrice('200000000000000000000');
     const { collateral: B_coll_2, netDebt: B_netDebt_2 } = await openTrove({ ICR: toBN(dec(150, 16)), extraZUSDAmount: dec(480, 18), extraParams: { from: bob, value: bob_remainingCollateral } });
     const { collateral: D_coll } = await openTrove({ ICR: toBN(dec(266, 16)), extraZUSDAmount: B_netDebt_2, extraParams: { from: dennis } });
+    // NEW: force redemption to come from troves (not the buffer)
+    await emptyRedemptionBufferAsOwner();
     await th.redeemCollateral(dennis, contracts, B_netDebt_2);
     price = await priceFeed.getPrice();
     const bob_surplus = B_coll_2.sub(B_netDebt_2.mul(mv._1e18BN).div(price));
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(bob), bob_surplus);
     // can claim collateral
-    const bob_balanceBefore_2 = th.toBN(await web3.eth.getBalance(bob));
+    const bob_balanceBefore_2 = toBN(await web3.eth.getBalance(bob));
     await borrowerOperations.claimCollateral({ from: bob, gasPrice: 0 });
-    const bob_balanceAfter_2 = th.toBN(await web3.eth.getBalance(bob));
-    th.assertIsApproximatelyEqual(bob_balanceAfter_2, bob_balanceBefore_2.add(th.toBN(bob_surplus)));
+    const bob_balanceAfter_2 = toBN(await web3.eth.getBalance(bob));
+    th.assertIsApproximatelyEqual(bob_balanceAfter_2, bob_balanceBefore_2.add(toBN(bob_surplus)));
   });
 
   it("liquidate(), with 110% < ICR < TCR, can claim collateral, after another claim from a redemption", async () => {
@@ -1670,6 +1690,9 @@ contract('TroveManager - in Recovery Mode', async accounts => {
     // --- TEST ---
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
+
+    // NEW: force redemption to come from troves (not the buffer)
+    await emptyRedemptionBufferAsOwner();
 
     // Dennis redeems 40, so Bob has a surplus of (200 * 1 - 40) / 200 = 0.8 ETH
     await th.redeemCollateral(dennis, contracts, B_netDebt);

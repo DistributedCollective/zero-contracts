@@ -65,58 +65,68 @@ contract('TroveManager', async accounts => {
   const withdrawZUSD = async (params) => th.withdrawZUSD(contracts, params);
 
   const drainRedemptionBufferWithWhale = async () => {
+    await emptyRedemptionBufferAsOwner();
+    /*// Use the same price source your tests are using
     const price = toBN(await priceFeed.getPrice());
 
     const bufferBalRBTC = toBN(await contracts.redemptionBuffer.getBalance()); // RBTC wei
-    const drainZUSD = bufferBalRBTC.mul(price).div(mv._1e18BN); // max ZUSD buffer can cover (floor)
+    const drainZUSD = bufferBalRBTC.mul(price).div(mv._1e18BN);               // max ZUSD buffer can cover (floor)
 
-    // If buffer can't cover even 1 wei of ZUSD at this price, nothing to do
     if (drainZUSD.eq(toBN(0))) return;
 
-    // Fund whale with enough ZUSD to perform the drain (we don't care about Alice/Bob/Carol wallet balances in this test)
-    let needed = drainZUSD.sub(toBN(await zusdToken.balanceOf(whale)));
+    // --- Fund whale with enough ZUSD (scan all accounts, not just alice/bob/carol) ---
+    let whaleBal = toBN(await zusdToken.balanceOf(whale));
+    let needed = drainZUSD.sub(whaleBal);
+
     if (needed.gt(toBN(0))) {
-      for (const src of [alice, bob, carol]) {
+      const all = await web3.eth.getAccounts();
+
+      for (const src of all) {
+        if (src === whale) continue;
+
         const srcBal = toBN(await zusdToken.balanceOf(src));
         if (srcBal.eq(toBN(0))) continue;
 
         const send = srcBal.gte(needed) ? needed : srcBal;
         await zusdToken.transfer(whale, send, { from: src });
+
         needed = needed.sub(send);
         if (needed.eq(toBN(0))) break;
       }
     }
 
-    // Sanity: whale must have enough now
-    const whaleBal = toBN(await zusdToken.balanceOf(whale));
-    assert(whaleBal.gte(drainZUSD), `whale doesn't have enough ZUSD to drain buffer: have=${whaleBal} need=${drainZUSD}`);
-
-    await zusdToken.approve(troveManager.address, drainZUSD, { from: whale });
-
-    // Hints (even if Troves won't be touched, some implementations still validate hints)
-    const { firstRedemptionHint, partialRedemptionHintNICR } =
-      await hintHelpers.getRedemptionHints(drainZUSD, price, 0);
-
-    const { 0: upperHint, 1: lowerHint } =
-      await sortedTroves.findInsertPosition(partialRedemptionHintNICR, whale, whale);
-
-    // Drain: this should be buffer-only (remaining-to-redeem from Troves becomes 0)
-    await troveManager.redeemCollateral(
-      drainZUSD,
-      firstRedemptionHint,
-      upperHint,
-      lowerHint,
-      partialRedemptionHintNICR,
-      0,
-      th._100pct,
-      { from: whale, gasPrice: 0 }
+    whaleBal = toBN(await zusdToken.balanceOf(whale));
+    assert.isTrue(
+      whaleBal.gte(drainZUSD),
+      `whale doesn't have enough ZUSD to drain buffer: have=${whaleBal.toString()} need=${drainZUSD.toString()}`
     );
 
-    // Verify buffer is effectively empty at this price (capacity == 0 ZUSD)
-    const bufferAfterRBTC = toBN(await contracts.redemptionBuffer.getBalance());
-    const bufferAfterMaxZUSD = bufferAfterRBTC.mul(price).div(mv._1e18BN);
-    assert.equal(bufferAfterMaxZUSD.toString(), "0", "buffer still has redeemable capacity");
+    // --- Drain: use the updated redemption helper so allowance/hints match buffer-first redeem ---
+    await th.redeemCollateralAndGetTxObject(whale, contracts, drainZUSD, th._100pct);
+
+    // Optional sanity: after drain, buffer should not be able to cover even 1 wei of ZUSD
+    const bufferAfter = toBN(await contracts.redemptionBuffer.getBalance());
+    const maxZusdAfter = bufferAfter.mul(price).div(mv._1e18BN);
+    assert.equal(maxZusdAfter.toString(), "0");*/
   };
+
+  const emptyRedemptionBufferAsOwner = async () => {
+    const bufferBal = toBN(await contracts.redemptionBuffer.getBalance());
+    if (bufferBal.eq(toBN(0))) return;
+
+    // RedemptionBuffer is Ownable — use its current owner (often `owner` or `multisig`)
+    const rbOwner = await contracts.redemptionBuffer.getOwner();
+
+    await contracts.redemptionBuffer.distributeToStakers(
+      bufferBal,
+      { from: rbOwner, gasPrice: 0 }
+    );
+
+    // sanity
+    const afterBal = toBN(await contracts.redemptionBuffer.getBalance());
+    assert.isTrue(afterBal.eq(toBN(0)), "buffer not fully emptied");
+  };
+
 
 
   before(async () => {
@@ -4587,6 +4597,9 @@ contract('TroveManager', async accounts => {
     const baseRate = await troveManager.baseRate();
     assert.equal(baseRate, '0');
 
+    // NEW: ensure the buffer can't satisfy part of the redemption
+    await emptyRedemptionBufferAsOwner();
+
     // whale redeems ZUSD.  Expect this to fully redeem A, B, C, and partially redeem D.
     await th.redeemCollateral(whale, contracts, redemptionAmount);
 
@@ -4770,11 +4783,13 @@ contract('TroveManager', async accounts => {
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
-    // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    // Empty the buffer without touching any user's ZUSD balance
+    await emptyRedemptionBufferAsOwner();
 
     // keep redeeming until we get the base rate to the ceiling of 100%
     for (let i = 0; i < 2; i++) {
+      // Ensure buffer is empty BEFORE the redemption (adjust/open below refill it)
+      await emptyRedemptionBufferAsOwner();
       // Find hints for redeeming
       const {
         firstRedemptionHint,
@@ -4804,8 +4819,12 @@ contract('TroveManager', async accounts => {
       );
 
       await openTrove({ ICR: toBN(dec(150, 16)), extraParams: { from: bob } });
-      await borrowerOperations.adjustTrove(th._100pct, 0, zusdAmount, true, alice, alice, { from: alice, value: zusdAmount.mul(mv._1e18BN).div(price) });
+      const bufferFee = await borrowerOperations.getRedemptionBufferFeeRBTCWithPrice(zusdAmount, price);
+      await borrowerOperations.adjustTrove(th._100pct, 0, zusdAmount, true, alice, alice, { from: alice, value: zusdAmount.mul(mv._1e18BN).div(price).add(bufferFee) });
     }
+
+    // Ensure buffer is empty before the final redemption attempt too
+    await emptyRedemptionBufferAsOwner();
 
     const {
       firstRedemptionHint,

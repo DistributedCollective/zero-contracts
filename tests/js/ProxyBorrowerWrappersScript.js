@@ -345,11 +345,14 @@ contract('BorrowerWrappers', async accounts => {
     // ie. 0.06 * 787,084.753044 = 47,225.0851826
     const expectedZEROGain_A = toBN('47225085182600000000000');
 
-    await priceFeed.setPrice(price.mul(toBN(2)));
+    const priceNow = price.mul(toBN(2));
+    await priceFeed.setPrice(priceNow);
+
+    const bufferFee = await borrowerOperations.getRedemptionBufferFeeRBTCWithPrice(netDebtChange, priceNow);
 
     // Alice claims SP rewards and puts them back in the system through the proxy
     const proxyAddress = borrowerWrappers.getProxyAddressFromUser(alice);
-    await borrowerWrappers.claimSPRewardsAndRecycle(th._100pct, alice, alice, { from: alice });
+    await borrowerWrappers.claimSPRewardsAndRecycle(th._100pct, alice, alice, { from: alice, value: bufferFee });
 
     const ethBalanceAfter = await web3.eth.getBalance(borrowerOperations.getProxyAddressFromUser(alice));
     const troveCollAfter = await troveManager.getTroveColl(alice);

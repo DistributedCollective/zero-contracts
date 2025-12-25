@@ -127,6 +127,10 @@ class BorrowerOperationsProxy extends Proxy {
     return this.forwardFunction(params, 'getRedemptionBufferFeeRBTC(uint256)')
   }
 
+  async getRedemptionBufferFeeRBTCWithPrice(...params) {
+    return this.forwardFunction(params, 'getRedemptionBufferFeeRBTCWithPrice(uint256,uint256)')
+  }
+
   async getNewTCRFromTroveChange(...params) {
     return this.proxyFunction('getNewTCRFromTroveChange', params)
   }

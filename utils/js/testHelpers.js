@@ -2064,12 +2064,14 @@ class TestHelper {
     // ------------------------------------------------------------------
     if (zusdFromBuffer.gt(toBN("0"))) {
       // Optional safety: reset allowance first for non-standard ERC20s
-      await contracts.zusdToken.approve(contracts.troveManager.address, 0, { from: redeemer });
+      await contracts.zusdToken.approve(contracts.troveManager.address, 0, { from: redeemer, gasPrice: 0 });
 
       await contracts.zusdToken.approve(
         contracts.troveManager.address,
         zusdFromBuffer,
-        { from: redeemer }
+        { from: redeemer,
+          gasPrice: 0
+        }
       );
     }
 
