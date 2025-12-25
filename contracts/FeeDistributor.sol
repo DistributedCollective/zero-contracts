@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.6.11;
 
 import "./Interfaces/IFeeDistributor.sol";
@@ -22,6 +21,8 @@ contract FeeDistributor is CheckContract, FeeDistributorStorage, IFeeDistributor
 
     event ZUSDDistributed(uint256 _zusdDistributedAmount);
     event RBTCistributed(uint256 _rbtcDistributedAmount);
+
+    event RedemptionBufferAddressChanged(address _redemptionBufferAddress);
 
     // --- Dependency setters ---
 
@@ -62,17 +63,48 @@ contract FeeDistributor is CheckContract, FeeDistributorStorage, IFeeDistributor
         emit ActivePoolAddressSet(_activePoolAddress);
     }
 
+    // --------------------------------------------------------------------
+    // RedemptionBuffer wiring
+    // --------------------------------------------------------------------
+
+    /**
+     * @notice Getter required by IFeeDistributor.
+     * @dev Implemented explicitly (instead of relying on a public storage variable getter)
+     *      to avoid multiple-inheritance conflicts in Solidity 0.6.x.
+     */
+    function redemptionBufferAddress() external view override returns (address) {
+        return _redemptionBufferAddress;
+    }
+
+    /**
+     * @notice Set RedemptionBuffer address.
+     * @dev Owner-only. This enables:
+     *      - accepting RBTC sent from RedemptionBuffer (receive())
+     *      - optionally allowing RedemptionBuffer to call distributeFees()
+     */
+    function setRedemptionBufferAddress(address _buffer) external override onlyOwner {
+        require(_buffer != address(0), "FeeDistributor: zero buffer");
+        checkContract(_buffer);
+
+        _redemptionBufferAddress = _buffer;
+        emit RedemptionBufferAddressChanged(_buffer);
+    }
+
     function setFeeToFeeSharingCollector(uint256 FEE_TO_FEE_SHARING_COLLECTOR_) public onlyOwner {
         FEE_TO_FEE_SHARING_COLLECTOR = FEE_TO_FEE_SHARING_COLLECTOR_;
     }
 
     function distributeFees() public override {
         require(
-            msg.sender == address(borrowerOperations) || msg.sender == address(troveManager),
+            msg.sender == address(borrowerOperations) ||
+                msg.sender == address(troveManager) ||
+                msg.sender == _redemptionBufferAddress,
             "FeeDistributor: invalid caller"
         );
+
         uint256 zusdtoDistribute = zusdToken.balanceOf(address(this));
         uint256 rbtcToDistribute = address(this).balance;
+
         if (zusdtoDistribute != 0) {
             _distributeZUSD(zusdtoDistribute);
         }
@@ -89,6 +121,7 @@ contract FeeDistributor is CheckContract, FeeDistributorStorage, IFeeDistributor
         zusdToken.approve(address(feeSharingCollector), feeToFeeSharingCollector);
 
         feeSharingCollector.transferTokens(address(zusdToken), uint96(feeToFeeSharingCollector));
+        
         // Send fee to ZERO staking contract
         uint256 feeToZeroStaking = toDistribute.sub(feeToFeeSharingCollector);
         if (feeToZeroStaking != 0) {
@@ -119,11 +152,14 @@ contract FeeDistributor is CheckContract, FeeDistributorStorage, IFeeDistributor
         emit RBTCistributed(toDistribute);
     }
 
-    function _requireCallerIsActivePool() internal view {
-        require(msg.sender == activePoolAddress, "FeeDistributor: caller is not ActivePool");
+    function _requireCallerIsActivePoolOrRedemptionBuffer() internal view {
+        require(
+            msg.sender == activePoolAddress || msg.sender == _redemptionBufferAddress,
+            "FeeDistributor: invalid RBTC sender"
+        );
     }
 
     receive() external payable {
-        _requireCallerIsActivePool();
+        _requireCallerIsActivePoolOrRedemptionBuffer();
     }
 }

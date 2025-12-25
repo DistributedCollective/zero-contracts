@@ -81,25 +81,63 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         borrowerOperations.openTrove{ value: totalCollateral }(_maxFee, _ZUSDAmount, _upperHint, _lowerHint);
     }
 
-    function claimSPRewardsAndRecycle(uint _maxFee, address _upperHint, address _lowerHint) external {
+    function claimSPRewardsAndRecycle(
+        uint _maxFee,
+        address _upperHint,
+        address _lowerHint
+    ) external payable {
         uint collBalanceBefore = address(this).balance;
         uint zeroBalanceBefore = zeroToken.balanceOf(address(this));
 
-        // Claim rewards
+        // Claim rewards (ETH gain + ZERO)
         stabilityPool.withdrawFromSP(0);
 
         uint collBalanceAfter = address(this).balance;
         uint zeroBalanceAfter = zeroToken.balanceOf(address(this));
+
+        // IMPORTANT: this is only the ETH gain from SP (msg.value cancels out because it was already in balanceBefore)
         uint claimedCollateral = collBalanceAfter.sub(collBalanceBefore);
 
-        // Add claimed ETH to trove, get more ZUSD and stake it into the Stability Pool
         if (claimedCollateral > 0) {
             _requireUserHasTrove(address(this));
-            uint ZUSDAmount = _getNetZUSDAmount(claimedCollateral);
-            borrowerOperations.adjustTrove{ value: claimedCollateral }(_maxFee, 0, ZUSDAmount, true, _upperHint, _lowerHint);
-            // Provide withdrawn ZUSD to Stability Pool
-            if (ZUSDAmount > 0) {
-                stabilityPool.provideToSP(ZUSDAmount, address(0));
+
+            uint zusdAmount = _getNetZUSDAmount(claimedCollateral);
+
+            // --- NEW: buffer fee on debt increase must be paid on top ---
+            uint bufferFee = 0;
+            if (zusdAmount > 0) {
+                // Prefer WithPrice so we control the price input and avoid extra fetchPrice side effects.
+                // getRedemptionBufferFeeRBTC(zusdAmount) would work as well.
+                uint p = priceFeed.fetchPrice();
+                bufferFee = borrowerOperations.getRedemptionBufferFeeRBTCWithPrice(zusdAmount, p);
+            }
+
+            require(msg.value >= bufferFee, "BorrowerWrappers: insufficient ETH for buffer fee");
+
+            borrowerOperations.adjustTrove{ value: claimedCollateral.add(bufferFee) }(
+                _maxFee,
+                0,
+                zusdAmount,
+                true,
+                _upperHint,
+                _lowerHint
+            );
+
+            if (zusdAmount > 0) {
+                stabilityPool.provideToSP(zusdAmount, address(0));
+            }
+
+            // Refund any extra ETH sent (keeps proxy ETH balance unchanged)
+            uint refund = msg.value.sub(bufferFee);
+            if (refund > 0) {
+                (bool ok, ) = msg.sender.call{ value: refund }("");
+                require(ok, "BorrowerWrappers: refund failed");
+            }
+        } else {
+            // If no ETH gain, don't trap ETH in the proxy
+            if (msg.value > 0) {
+                (bool ok, ) = msg.sender.call{ value: msg.value }("");
+                require(ok, "BorrowerWrappers: refund failed");
             }
         }
 
@@ -109,6 +147,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
             zeroStaking.stake(claimedZERO);
         }
     }
+
 
     function claimStakingGainsAndRecycle(uint _maxFee, address _upperHint, address _lowerHint) external {
         uint collBalanceBefore = address(this).balance;

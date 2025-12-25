@@ -25,6 +25,24 @@ contract TroveManagerBase is LiquityBase, TroveManagerStorage {
      */
     uint256 public constant BETA = 2;
 
+    // ---------------------------------------------------------------------
+    // Reentrancy guard
+    // ---------------------------------------------------------------------
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+
+    modifier nonReentrant() {
+        require(_reentrancyStatus != _ENTERED, "TroveManager: reentrant call");
+        _reentrancyStatus = _ENTERED;
+        _;
+        _reentrancyStatus = _NOT_ENTERED;
+    }
+
+    modifier requireNotEntered() {
+        require(_reentrancyStatus != _ENTERED, "TroveManager: locked");
+        _;
+    }
+
     /**
       --- Variable container structs for liquidations ---
      
@@ -152,6 +170,7 @@ contract TroveManagerBase is LiquityBase, TroveManagerStorage {
 
     constructor(uint256 _bootstrapPeriod) public {
         BOOTSTRAP_PERIOD = _bootstrapPeriod;
+        _reentrancyStatus = _NOT_ENTERED; // init guard
     }
 
     /// Return the current collateral ratio (ICR) of a given Trove. Takes a trove's pending coll and debt rewards from redistributions into account.
@@ -351,6 +370,9 @@ contract TroveManagerBase is LiquityBase, TroveManagerStorage {
         uint256 _redemptionRate,
         uint256 _ETHDrawn
     ) internal pure returns (uint256) {
+        if (_ETHDrawn == 0) {
+            return 0; // This prevents a revert if for instance no eth is drawn from the redemption buffer or no eth is drawn from troves.
+        }
         uint256 redemptionFee = _redemptionRate.mul(_ETHDrawn).div(DECIMAL_PRECISION);
         require(
             redemptionFee < _ETHDrawn,

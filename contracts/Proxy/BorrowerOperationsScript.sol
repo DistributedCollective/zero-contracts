@@ -45,4 +45,16 @@ contract BorrowerOperationsScript is CheckContract {
     function claimCollateral() external {
         borrowerOperations.claimCollateral();
     }
+
+    function getRedemptionBufferFeeRBTC(uint256 _ZUSDAmount) external {
+        borrowerOperations.getRedemptionBufferFeeRBTC(_ZUSDAmount);
+    }
+
+    function getRedemptionBufferFeeRBTCWithPrice(uint256 _ZUSDAmount, uint256 _price) external {
+        borrowerOperations.getRedemptionBufferFeeRBTCWithPrice(_ZUSDAmount, _price);
+    }
+
+    function getRedemptionBufferRate() external {
+        borrowerOperations.getRedemptionBufferRate();
+    }
 }

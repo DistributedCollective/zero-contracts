@@ -559,7 +559,9 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     await borrowerOperations.addColl(bob, bob, { from: bob, value: addedColl });
 
     // Alice withdraws ZUSD
-    await borrowerOperations.withdrawZUSD(th._100pct, await getNetBorrowingAmount(A_totalDebt), alice, alice, { from: alice });
+    const borrowAmount = await getNetBorrowingAmount(A_totalDebt);
+    const buffFee = await th.getRedemptionBufferFeeRBTC(contracts, borrowAmount, alice);
+    await borrowerOperations.withdrawZUSD(th._100pct, borrowAmount, alice, alice, { from: alice, value: buffFee });
 
     // Price drops to 100 $/E
     await priceFeed.setPrice(dec(100, 18));
@@ -897,7 +899,9 @@ contract('TroveManager - Redistribution reward calculations', async accounts => 
     await borrowerOperations.withdrawColl(withdrawnColl, bob, bob, { from: bob });
 
     // Alice withdraws ZUSD
-    await borrowerOperations.withdrawZUSD(th._100pct, await getNetBorrowingAmount(A_totalDebt), alice, alice, { from: alice });
+    const borrowAmount = await getNetBorrowingAmount(A_totalDebt);
+    const buffFee = await th.getRedemptionBufferFeeRBTC(contracts, borrowAmount, alice);
+    await borrowerOperations.withdrawZUSD(th._100pct, await getNetBorrowingAmount(A_totalDebt), alice, alice, { from: alice, value: buffFee });
 
     // Price drops to 100 $/E
     await priceFeed.setPrice(dec(100, 18));

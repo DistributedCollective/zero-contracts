@@ -73,7 +73,12 @@ contract('CollSurplusPool', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // At ETH:USD = 100, this redemption should leave 1 ether of coll surplus
-    await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt);
+    // In order to have the desired test result, we need to redeem all of the RedemptionBuffer balance along with our intended redemption amount:
+    const bufferBal = toBN(await contracts.redemptionBuffer.getBalance()); // important: match contract logic
+    const maxZusdFromBuffer = bufferBal.mul(price).div(mv._1e18BN);
+    // Redeem enough so that AFTER the buffer swap, there's still `redeemAmount` left to redeem from troves:
+    const totalToRedeem = toBN(B_netDebt).add(maxZusdFromBuffer);
+    await th.redeemCollateralAndGetTxObject(A, contracts, totalToRedeem);
 
     const ETH_2 = await collSurplusPool.getETH();
     th.assertIsApproximatelyEqual(ETH_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)));
@@ -98,14 +103,20 @@ contract('CollSurplusPool', async accounts => {
     const B_zusdAmount = toBN(dec(3000, 18));
     const B_netDebt = await th.getAmountWithBorrowingFee(contracts, B_zusdAmount);
     const openTroveData = th.getTransactionData('openTrove(uint256,uint256,address,address)', ['0xde0b6b3a7640000', web3.utils.toHex(B_zusdAmount), B, B]);
-    await nonPayable.forward(borrowerOperations.address, openTroveData, { value: B_coll });
+    const B_bufFee = await th.getRedemptionBufferFeeRBTC(contracts, B_zusdAmount, nonPayable.address); // get the redemption buffer fee for B
+    await nonPayable.forward(borrowerOperations.address, openTroveData, { value: B_coll.add(B_bufFee) }); // add the buffer fee on top of the collateral
     await openTrove({ extraZUSDAmount: B_netDebt, extraParams: { from: A, value: dec(3000, 'ether') } });
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // At ETH:USD = 100, this redemption should leave 1 ether of coll surplus for B
-    await th.redeemCollateralAndGetTxObject(A, contracts, B_netDebt);
+    // In order to have the desired test result, we need to redeem all of the RedemptionBuffer balance along with our intended redemption amount:
+    const bufferBal = toBN(await contracts.redemptionBuffer.getBalance()); // important: match contract logic
+    const maxZusdFromBuffer = bufferBal.mul(price).div(mv._1e18BN);
+    // Redeem enough so that AFTER the buffer swap, there's still `redeemAmount` left to redeem from troves:
+    const totalToRedeem = toBN(B_netDebt).add(maxZusdFromBuffer);
+    await th.redeemCollateralAndGetTxObject(A, contracts, totalToRedeem);
 
     const ETH_2 = await collSurplusPool.getETH();
     th.assertIsApproximatelyEqual(ETH_2, B_coll.sub(B_netDebt.mul(mv._1e18BN).div(price)));

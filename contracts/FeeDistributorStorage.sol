@@ -31,4 +31,7 @@ contract FeeDistributorStorage is Ownable {
 
     //pct of fees sent to feeSharingCollector address
     uint256 public FEE_TO_FEE_SHARING_COLLECTOR;
+    
+    // Buffer address so we can accept RBTC from it and optionally let it call distributeFees()
+    address internal _redemptionBufferAddress;
 }

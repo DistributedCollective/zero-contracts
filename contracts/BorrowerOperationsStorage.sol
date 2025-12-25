@@ -12,6 +12,7 @@ import "./Interfaces/IZEROStaking.sol";
 import "./Interfaces/IFeeDistributor.sol";
 import "./Dependencies/Ownable.sol";
 import "./Dependencies/Mynt/IMassetManager.sol";
+import "./Interfaces/IRedemptionBuffer.sol";
 
 contract BorrowerOperationsStorage is Ownable {
     string public constant NAME = "BorrowerOperations";
@@ -36,4 +37,19 @@ contract BorrowerOperationsStorage is Ownable {
 
     IMassetManager public massetManager;
     IFeeDistributor public feeDistributor;
+
+    // --- Redemption buffer config ---
+
+    // Redemption buffer contract used to hold protocol RBTC
+    IRedemptionBuffer internal redemptionBuffer;
+
+    // Fraction of incoming RBTC sent to the buffer on openTrove.
+    // 1e18 == 100%, e.g. 1e17 == 10%.
+    uint256 internal redemptionBufferRate;
+
+    // ---------------------------------------------------------------------
+    // Reentrancy guard (BorrowerOperations only)
+    // ---------------------------------------------------------------------
+    // 0 = uninitialized, 1 = not entered, 2 = entered
+    uint256 internal _reentrancyStatus;
 }

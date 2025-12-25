@@ -157,7 +157,7 @@ contract('BorrowerWrappers', async accounts => {
     await openTrove({ ICR: toBN(dec(2, 18)), extraParams: { from: whale } });
 
     // alice opens Trove
-    const { zusdAmount, collateral } = await openTrove({ ICR: toBN(dec(15, 17)), extraParams: { from: alice } });
+    const { requestedZUSDAmount, collateral, bufferFee } = await openTrove({ ICR: toBN(dec(15, 17)), extraParams: { from: alice } });
 
     const proxyAddress = borrowerWrappers.getProxyAddressFromUser(alice);
     assert.equal(await web3.eth.getBalance(proxyAddress), '0');
@@ -167,21 +167,22 @@ contract('BorrowerWrappers', async accounts => {
 
     // alice claims collateral and re-opens the trove
     await assertRevert(
-      borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, zusdAmount, alice, alice, { from: alice }),
+      borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, requestedZUSDAmount, alice, alice, { from: alice }),
       'CollSurplusPool: No collateral available to claim'
     );
 
     // check everything remain the same
     assert.equal(await web3.eth.getBalance(proxyAddress), '0');
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(proxyAddress), '0');
-    th.assertIsApproximatelyEqual(await zusdToken.balanceOf(proxyAddress), zusdAmount);
+    th.assertIsApproximatelyEqual(await zusdToken.balanceOf(proxyAddress), requestedZUSDAmount);
     assert.equal(await troveManager.getTroveStatus(proxyAddress), 1);
     th.assertIsApproximatelyEqual(await troveManager.getTroveColl(proxyAddress), collateral);
   });
 
   it('claimCollateralAndOpenTrove(): without sending any value', async () => {
+    const price = await priceFeed.getPrice();
     // alice opens Trove
-    const { zusdAmount, netDebt: redeemAmount, collateral } = await openTrove({ extraZUSDAmount: 0, ICR: toBN(dec(3, 18)), extraParams: { from: alice } });
+    const { requestedZUSDAmount, netDebt: redeemAmount, collateral, bufferFee } = await openTrove({ extraZUSDAmount: 0, ICR: toBN(dec(3, 18)), extraParams: { from: alice } });
     // Whale opens Trove
     await openTrove({ extraZUSDAmount: redeemAmount, ICR: toBN(dec(5, 18)), extraParams: { from: whale } });
 
@@ -192,28 +193,37 @@ contract('BorrowerWrappers', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // whale redeems 150 ZUSD
-    await th.redeemCollateral(whale, contracts, redeemAmount);
+    //await th.redeemCollateral(whale, contracts, redeemAmount);
+
+    // In order to have the desired test result, we need to redeem all of the RedemptionBuffer balance along with our intended redemption amount:
+    const bufferBal = toBN(await contracts.redemptionBuffer.getBalance()); // important: match contract logic
+    const maxZusdFromBuffer = bufferBal.mul(price).div(mv._1e18BN);
+    // Redeem enough so that AFTER the buffer swap, there's still `redeemAmount` left to redeem from troves:
+    const totalToRedeem = toBN(redeemAmount).add(maxZusdFromBuffer);
+    await th.redeemCollateral(whale, contracts, totalToRedeem);
     assert.equal(await web3.eth.getBalance(proxyAddress), '0');
 
     // surplus: 5 - 150/200
-    const price = await priceFeed.getPrice();
     const expectedSurplus = collateral.sub(redeemAmount.mul(mv._1e18BN).div(price));
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(proxyAddress), expectedSurplus);
     assert.equal(await troveManager.getTroveStatus(proxyAddress), 4); // closed by redemption
 
     // alice claims collateral and re-opens the trove
-    await borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, zusdAmount, alice, alice, { from: alice });
+    // We need to set value to the RedemptionBuffer fee for the internal openTrove() call.
+    const reopenBufFee = await th.getRedemptionBufferFeeRBTC(contracts, requestedZUSDAmount, alice);
+    await borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, requestedZUSDAmount, alice, alice, { from: alice, value: reopenBufFee });
 
     assert.equal(await web3.eth.getBalance(proxyAddress), '0');
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(proxyAddress), '0');
-    th.assertIsApproximatelyEqual(await zusdToken.balanceOf(proxyAddress), zusdAmount.mul(toBN(2)));
+    th.assertIsApproximatelyEqual(await zusdToken.balanceOf(proxyAddress), requestedZUSDAmount.mul(toBN(2)));
     assert.equal(await troveManager.getTroveStatus(proxyAddress), 1);
     th.assertIsApproximatelyEqual(await troveManager.getTroveColl(proxyAddress), expectedSurplus);
   });
 
   it('claimCollateralAndOpenTrove(): sending value in the transaction', async () => {
+    const price = await priceFeed.getPrice();
     // alice opens Trove
-    const { zusdAmount, netDebt: redeemAmount, collateral } = await openTrove({ extraParams: { from: alice } });
+    const { requestedZUSDAmount, netDebt: redeemAmount, collateral } = await openTrove({ extraParams: { from: alice } });
     // Whale opens Trove
     await openTrove({ extraZUSDAmount: redeemAmount, ICR: toBN(dec(2, 18)), extraParams: { from: whale } });
 
@@ -224,21 +234,27 @@ contract('BorrowerWrappers', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // whale redeems 150 ZUSD
-    await th.redeemCollateral(whale, contracts, redeemAmount);
+    //await th.redeemCollateral(whale, contracts, redeemAmount);
+    const bufferBal = toBN(await contracts.redemptionBuffer.getBalance()); // important: match contract logic
+    const maxZusdFromBuffer = bufferBal.mul(price).div(mv._1e18BN);
+    // Redeem enough so that AFTER the buffer swap, there's still `redeemAmount` left to redeem from troves:
+    const totalToRedeem = toBN(redeemAmount).add(maxZusdFromBuffer);
+    await th.redeemCollateral(whale, contracts, totalToRedeem);
     assert.equal(await web3.eth.getBalance(proxyAddress), '0');
 
     // surplus: 5 - 150/200
-    const price = await priceFeed.getPrice();
     const expectedSurplus = collateral.sub(redeemAmount.mul(mv._1e18BN).div(price));
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(proxyAddress), expectedSurplus);
     assert.equal(await troveManager.getTroveStatus(proxyAddress), 4); // closed by redemption
 
     // alice claims collateral and re-opens the trove
-    await borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, zusdAmount, alice, alice, { from: alice, value: collateral });
+    // We need to set value to the RedemptionBuffer fee for the internal openTrove() call.
+    const reopenBufFee = await th.getRedemptionBufferFeeRBTC(contracts, requestedZUSDAmount, alice);
+    await borrowerWrappers.claimCollateralAndOpenTrove(th._100pct, requestedZUSDAmount, alice, alice, { from: alice, value: collateral.add(reopenBufFee) });
 
     assert.equal(await web3.eth.getBalance(proxyAddress), '0');
     th.assertIsApproximatelyEqual(await collSurplusPool.getCollateral(proxyAddress), '0');
-    th.assertIsApproximatelyEqual(await zusdToken.balanceOf(proxyAddress), zusdAmount.mul(toBN(2)));
+    th.assertIsApproximatelyEqual(await zusdToken.balanceOf(proxyAddress), requestedZUSDAmount.mul(toBN(2)));
     assert.equal(await troveManager.getTroveStatus(proxyAddress), 1);
     th.assertIsApproximatelyEqual(await troveManager.getTroveColl(proxyAddress), expectedSurplus.add(collateral));
   });
@@ -286,7 +302,7 @@ contract('BorrowerWrappers', async accounts => {
     await stabilityPool.provideToSP(aliceDeposit, ZERO_ADDRESS, { from: alice });
 
     // Defaulter Trove opened
-    const { zusdAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
+    const { requestedZUSDAmount: zusdAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
 
     // price drops: defaulters' Troves fall below MCR, alice and whale Trove remain active
     const price = toBN(dec(100, 18));
@@ -329,11 +345,14 @@ contract('BorrowerWrappers', async accounts => {
     // ie. 0.06 * 787,084.753044 = 47,225.0851826
     const expectedZEROGain_A = toBN('47225085182600000000000');
 
-    await priceFeed.setPrice(price.mul(toBN(2)));
+    const priceNow = price.mul(toBN(2));
+    await priceFeed.setPrice(priceNow);
+
+    const bufferFee = await borrowerOperations.getRedemptionBufferFeeRBTCWithPrice(netDebtChange, priceNow);
 
     // Alice claims SP rewards and puts them back in the system through the proxy
     const proxyAddress = borrowerWrappers.getProxyAddressFromUser(alice);
-    await borrowerWrappers.claimSPRewardsAndRecycle(th._100pct, alice, alice, { from: alice });
+    await borrowerWrappers.claimSPRewardsAndRecycle(th._100pct, alice, alice, { from: alice, value: bufferFee });
 
     const ethBalanceAfter = await web3.eth.getBalance(borrowerOperations.getProxyAddressFromUser(alice));
     const troveCollAfter = await troveManager.getTroveColl(alice);
@@ -387,7 +406,7 @@ contract('BorrowerWrappers', async accounts => {
     await zeroStaking.stake(dec(150, 18), { from: alice });
 
     // Defaulter Trove opened
-    const { zusdAmount, netDebt, totalDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
+    const { requestedZUSDAmount, netDebt, totalDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
 
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
@@ -425,8 +444,8 @@ contract('BorrowerWrappers', async accounts => {
     await zeroStaking.stake(dec(150, 18), { from: alice });
 
     // Defaulter Trove opened
-    const { zusdAmount, netDebt, totalDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
-    const borrowingFee = netDebt.sub(zusdAmount);
+    const { requestedZUSDAmount, netDebt, totalDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
+    const borrowingFee = netDebt.sub(requestedZUSDAmount);
 
     // Alice ZUSD gain is ((150/2000) * borrowingFee)
     const expectedZUSDGain_A = borrowingFee.mul(toBN(dec(150, 18))).div(toBN(dec(2000, 18)));
@@ -488,8 +507,8 @@ contract('BorrowerWrappers', async accounts => {
     const feeSharingCollectorZUSDBalanceBefore = await zusdToken.balanceOf(feeSharingCollector);
 
     // Defaulter Trove opened
-    const { zusdAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
-    const borrowingFee = netDebt.sub(zusdAmount);
+    const { requestedZUSDAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
+    const borrowingFee = netDebt.sub(requestedZUSDAmount);
     // 100% sent to feeSharingCollector address
     const borrowingFeeToFeeSharingCollector = borrowingFee.mul(toBN(dec(100, 16))).div(mv._1e18BN);
     const feeSharingCollectorZUSDBalanceAfter = await zusdToken.balanceOf(feeSharingCollector);
@@ -513,7 +532,7 @@ contract('BorrowerWrappers', async accounts => {
     const redeemedAmount = toBN(dec(100, 18));
     const feeSharingCollectorBalanceBefore = await wrbtcToken.balanceOf(feeSharingCollector);
     await th.redeemCollateral(whale, contracts, redeemedAmount);
-    const feeSharingCollectorBalanceAfter = web3.utils.toBN(await web3.eth.getBalance(feeSharingCollector));
+    const feeSharingCollectorBalanceAfter = toBN(await web3.eth.getBalance(feeSharingCollector));
 
     // Alice ETH gain is ((150/2000) * (redemption fee over redeemedAmount) / price)
     const redemptionFee = await troveManager.getRedemptionFeeWithDecay(redeemedAmount);
@@ -610,8 +629,8 @@ contract('BorrowerWrappers', async accounts => {
     const feeSharingCollectorZUSDBalanceBefore = await zusdToken.balanceOf(feeSharingCollector);
 
     // Defaulter Trove opened
-    const { zusdAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
-    const borrowingFee = netDebt.sub(zusdAmount);
+    const { requestedZUSDAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
+    const borrowingFee = netDebt.sub(requestedZUSDAmount);
 
     // 100% sent to feeSharingCollector address
     const borrowingFeeToFeeSharingCollector = borrowingFee.mul(toBN(dec(100, 16))).div(mv._1e18BN);
@@ -688,8 +707,8 @@ contract('BorrowerWrappers', async accounts => {
     const feeSharingCollectorZUSDBalanceBefore = await zusdToken.balanceOf(feeSharingCollector);
 
     // Defaulter Trove opened
-    const { zusdAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
-    const borrowingFee = netDebt.sub(zusdAmount);
+    const { requestedZUSDAmount, netDebt, collateral } = await openTrove({ ICR: toBN(dec(210, 16)), extraParams: { from: defaulter_1 } });
+    const borrowingFee = netDebt.sub(requestedZUSDAmount);
 
     // 100% sent to feeSharingCollector address
     const borrowingFeeToFeeSharingCollector = borrowingFee.mul(toBN(dec(100, 16))).div(mv._1e18BN);
@@ -706,7 +725,7 @@ contract('BorrowerWrappers', async accounts => {
     const redeemedAmount = toBN(dec(100, 18));
     const feeSharingCollectorBalanceBefore = await wrbtcToken.balanceOf(feeSharingCollector);
     await th.redeemCollateral(whale, contracts, redeemedAmount);
-    const feeSharingCollectorBalanceAfter = web3.utils.toBN(await web3.eth.getBalance(feeSharingCollector));
+    const feeSharingCollectorBalanceAfter = toBN(await web3.eth.getBalance(feeSharingCollector));
 
     // Alice ETH gain is ((150/2000) * (redemption fee over redeemedAmount) / price)
     const redemptionFee = await troveManager.getRedemptionFeeWithDecay(redeemedAmount);

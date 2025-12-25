@@ -2054,7 +2054,9 @@ contract('StabilityPool', async accounts => {
       await priceFeed.setPrice(dec(200, 18));
 
       // Bob issues a further 5000 ZUSD from his trove 
-      await borrowerOperations.withdrawZUSD(th._100pct, dec(5000, 18), bob, bob, { from: bob });
+      const requestedZUSDAmount = dec(5000, 18);
+      const reopenBufFee = await th.getRedemptionBufferFeeRBTC(contracts, requestedZUSDAmount, bob);
+      await borrowerOperations.withdrawZUSD(th._100pct, requestedZUSDAmount, bob, bob, { from: bob, value: reopenBufFee });
 
       // Expect Alice's ZUSD balance increase be very close to 8333.3333333333333333 ZUSD
       await stabilityPool.withdrawFromSP(dec(10000, 18), { from: alice });

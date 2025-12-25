@@ -549,6 +549,64 @@ class TestHelper {
     return { newColl, newDebt };
   }
 
+
+  static _getBorrowerOpsTruffleInstance(contracts) {
+    const bo = contracts.borrowerOperations;
+
+    // If it's the Proxy wrapper, it has forwardFunction() and a .contract pointing to the real Truffle instance
+    if (bo && typeof bo.forwardFunction === "function" && bo.contract) {
+      return bo.contract;
+    }
+
+    // Otherwise it's already the Truffle contract instance
+    return bo;
+  }
+
+  static _getBorrowerOpsCallFrom(contracts, from) {
+    const bo = contracts.borrowerOperations;
+
+    // In proxy tests, you may want msg.sender == DSProxy during eth_call
+    if (bo && typeof bo.getProxyAddressFromUser === "function") {
+      return bo.getProxyAddressFromUser(from);
+    }
+
+    return from;
+  }
+
+  static _getTroveManagerTruffleInstance(contracts) {
+    const tm = contracts.troveManager;
+
+    // Proxy wrapper has forwardFunction() and .contract points to the real Truffle instance
+    if (tm && typeof tm.forwardFunction === "function" && tm.contract) {
+      return tm.contract;
+    }
+
+    // Already the Truffle instance
+    return tm;
+  }
+
+
+  static async getRedemptionBufferFeeRBTC(contracts, zusdAmount, from) {
+    const bo = this._getBorrowerOpsTruffleInstance(contracts);
+    if (!bo || !bo.getRedemptionBufferFeeRBTC) return this.toBN(0);
+
+    const callFrom = from && from !== this.ZERO_ADDRESS ? this._getBorrowerOpsCallFrom(contracts, from) : undefined;
+    const opts = callFrom ? { from: callFrom } : {};
+
+    return this.toBN(await bo.getRedemptionBufferFeeRBTC.call(zusdAmount, opts));
+  }
+
+  static _getBorrowerAddress(contracts, user) {
+    // If this is a proxy wrapper, map to DSProxy
+    if (contracts.borrowerOperations && typeof contracts.borrowerOperations.getProxyAddressFromUser === "function") {
+      return contracts.borrowerOperations.getProxyAddressFromUser(user);
+    }
+    return user;
+  }
+
+
+
+
   // --- BorrowerOperations gas functions ---
 
   static async openTrove_allAccounts(accounts, contracts, ETHAmount, ZUSDAmount) {
@@ -752,45 +810,86 @@ class TestHelper {
 
   static async openTrove(
     contracts,
-    { maxFeePercentage, extraZUSDAmount, upperHint, lowerHint, ICR, extraParams }
+    { maxFeePercentage, zusdAmount, extraZUSDAmount, upperHint, lowerHint, ICR, extraParams }
   ) {
+    // Can't specify both
+    if (zusdAmount !== undefined && extraZUSDAmount !== undefined) {
+      throw new Error("openTrove helper: specify either zusdAmount OR extraZUSDAmount, not both");
+    }
+
     if (!maxFeePercentage) maxFeePercentage = this._100pct;
+
     if (!extraZUSDAmount) extraZUSDAmount = this.toBN(0);
     else if (typeof extraZUSDAmount == "string") extraZUSDAmount = this.toBN(extraZUSDAmount);
+
     if (!upperHint) upperHint = this.ZERO_ADDRESS;
     if (!lowerHint) lowerHint = this.ZERO_ADDRESS;
+
+    if (!extraParams) extraParams = {};
+    if (!extraParams.from) throw new Error("openTrove helper: extraParams.from is required");
+
+    const from = extraParams.from;
 
     const MIN_DEBT = (
       await this.getNetBorrowingAmount(contracts, await contracts.borrowerOperations.MIN_NET_DEBT())
     ).add(this.toBN(1)); // add 1 to avoid rounding issues
-    const zusdAmount = MIN_DEBT.add(extraZUSDAmount);
 
-    if (!ICR && !extraParams.value) ICR = this.toBN(this.dec(15, 17));
-    // 150%
+    // Decide requested ZUSD amount
+    let requestedZUSDAmount;
+    if (zusdAmount !== undefined) {
+      requestedZUSDAmount = typeof zusdAmount === "string" ? this.toBN(zusdAmount) : this.toBN(zusdAmount);
+    } else {
+      if (!extraZUSDAmount) extraZUSDAmount = this.toBN(0);
+      else if (typeof extraZUSDAmount === "string") extraZUSDAmount = this.toBN(extraZUSDAmount);
+
+      requestedZUSDAmount = MIN_DEBT.add(extraZUSDAmount);
+    }
+
+    if (!ICR && !extraParams.value) ICR = this.toBN(this.dec(15, 17)); // 150%
     else if (typeof ICR == "string") ICR = this.toBN(ICR);
 
-    const totalDebt = await this.getOpenTroveTotalDebt(contracts, zusdAmount);
+    const totalDebt = await this.getOpenTroveTotalDebt(contracts, requestedZUSDAmount);
     const netDebt = await this.getActualDebtFromComposite(totalDebt, contracts);
 
+    // -----------------------------
+    // NEW: compute intended trove collateral + buffer fee-on-top
+    // -----------------------------
+
+    // 1) intended collateral that should end up in the trove / ActivePool (NOT including buffer fee)
+    let collateral;
     if (ICR) {
       const price = await contracts.priceFeedTestnet.getPrice();
-      extraParams.value = ICR.mul(totalDebt).div(price);
+      collateral = ICR.mul(totalDebt).div(price);
+    } else {
+      // If caller supplied a value without ICR, treat it as intended trove collateral
+      // (previously msg.value == collateral; now we add fee on top)
+      collateral =
+        typeof extraParams.value == "string" ? this.toBN(extraParams.value) : this.toBN(extraParams.value);
     }
+
+    // 2) quote the buffer fee for this borrow amount
+    const bufferFee = await this.getRedemptionBufferFeeRBTC(contracts, requestedZUSDAmount, from);
+
+    // 3) send collateral + fee
+    const totalValue = collateral.add(bufferFee);
+    extraParams.value = totalValue;
 
     const tx = await contracts.borrowerOperations.openTrove(
       maxFeePercentage,
-      zusdAmount,
+      requestedZUSDAmount,
       upperHint,
       lowerHint,
       extraParams
     );
 
     return {
-      zusdAmount,
+      requestedZUSDAmount,
       netDebt,
       totalDebt,
       ICR,
-      collateral: extraParams.value,
+      collateral,        // trove collateral (what ends up in ActivePool / Trove)
+      bufferFee,         // fee paid to RedemptionBuffer
+      totalValue,        // msg.value actually sent (collateral + fee)
       tx
     };
   }
@@ -800,27 +899,49 @@ class TestHelper {
     { maxFeePercentage, extraZUSDAmount, upperHint, lowerHint, ICR, extraParams }
   ) {
     if (!maxFeePercentage) maxFeePercentage = this._100pct;
+
     if (!extraZUSDAmount) extraZUSDAmount = this.toBN(0);
     else if (typeof extraZUSDAmount == "string") extraZUSDAmount = this.toBN(extraZUSDAmount);
+
     if (!upperHint) upperHint = this.ZERO_ADDRESS;
     if (!lowerHint) lowerHint = this.ZERO_ADDRESS;
+
+    if (!extraParams) extraParams = {};
+    if (!extraParams.from) throw new Error("openNueTrove helper: extraParams.from is required");
+    const from = extraParams.from;
 
     const MIN_DEBT = (
       await this.getNetBorrowingAmount(contracts, await contracts.borrowerOperations.MIN_NET_DEBT())
     ).add(this.toBN(1)); // add 1 to avoid rounding issues
+
     const zusdAmount = MIN_DEBT.add(extraZUSDAmount);
 
-    if (!ICR && !extraParams.value) ICR = this.toBN(this.dec(15, 17));
-    // 150%
+    if (!ICR && !extraParams.value) ICR = this.toBN(this.dec(15, 17)); // 150%
     else if (typeof ICR == "string") ICR = this.toBN(ICR);
 
     const totalDebt = await this.getOpenTroveTotalDebt(contracts, zusdAmount);
     const netDebt = await this.getActualDebtFromComposite(totalDebt, contracts);
 
+    // -----------------------------
+    // NEW: compute intended trove collateral + buffer fee-on-top
+    // -----------------------------
+
+    // 1) intended collateral that should end up in the trove (NOT including buffer fee)
+    let collateral;
     if (ICR) {
       const price = await contracts.priceFeedTestnet.getPrice();
-      extraParams.value = ICR.mul(totalDebt).div(price);
+      collateral = ICR.mul(totalDebt).div(price);
+    } else {
+      // If caller supplied a value without ICR, treat it as intended trove collateral
+      collateral = this.toBN(extraParams.value);
     }
+
+    // 2) quote the buffer fee for this borrow amount (non-view -> use .call())
+    const bufferFee = await this.getRedemptionBufferFeeRBTC(contracts, zusdAmount, from);
+
+    // 3) send collateral + fee
+    const totalValue = collateral.add(bufferFee);
+    extraParams.value = totalValue;
 
     const tx = await contracts.borrowerOperations.openNueTrove(
       maxFeePercentage,
@@ -835,11 +956,365 @@ class TestHelper {
       netDebt,
       totalDebt,
       ICR,
-      collateral: extraParams.value,
+      collateral,   // trove collateral (what ends up in ActivePool / Trove)
+      bufferFee,    // fee paid to RedemptionBuffer
+      totalValue,   // msg.value actually sent (collateral + fee)
       tx
     };
   }
 
+  /**
+   * adjustTrove(): wrapper around BorrowerOperations.adjustTrove that:
+   * - optionally targets an ICR (for debt increase)
+   * - automatically adds the RedemptionBuffer fee to msg.value when minting new ZUSD
+   *
+   * Notes:
+   * - extraParams.value is treated as the *collateral top-up* (the amount that should end up in the trove),
+   *   NOT including the buffer fee.
+   * - If you are only increasing debt and not topping up collateral, omit extraParams.value and the helper
+   *   will still send msg.value = bufferFee so the tx doesn't revert.
+   */
+  static async adjustTrove(
+    contracts,
+    { maxFeePercentage, collWithdrawal, zusdAmount, ICR, isDebtIncrease, upperHint, lowerHint, extraParams }
+  ) {
+    if (!extraParams) extraParams = {};
+    if (maxFeePercentage === undefined || maxFeePercentage === null) maxFeePercentage = this._100pct;
+    maxFeePercentage = this.toBN(maxFeePercentage);
+    if (upperHint === undefined || upperHint === null) upperHint = this.ZERO_ADDRESS;
+    if (lowerHint === undefined || lowerHint === null) lowerHint = this.ZERO_ADDRESS;
+    if (collWithdrawal === undefined) collWithdrawal = this.toBN(0);
+    else collWithdrawal = this.toBN(collWithdrawal);
+
+    // default
+    if (zusdAmount === undefined) zusdAmount = this.toBN(0);
+    else zusdAmount = (typeof zusdAmount === "string") ? this.toBN(zusdAmount) : this.toBN(zusdAmount);
+
+    // Default bool: infer from zusdAmount if not explicitly passed
+    if (isDebtIncrease === undefined) isDebtIncrease = zusdAmount.gt(this.toBN(0));
+
+    // Collateral topup intended for the trove (excluding buffer fee)
+    let collTopUp = extraParams.value ? this.toBN(extraParams.value) : this.toBN(0);
+
+    // If targeting an ICR, compute the required ZUSD amount (debt increase only)
+    let increasedTotalDebt = this.toBN(0);
+    if (ICR) {
+      assert(isDebtIncrease, "ICR targeting only makes sense for debt increases");
+      assert(extraParams.from, "A 'from' account is needed");
+
+      ICR = (typeof ICR === "string") ? this.toBN(ICR) : this.toBN(ICR);
+
+      const borrower = this._getBorrowerAddress(contracts, extraParams.from);
+      const { debt, coll } = await contracts.troveManager.getEntireDebtAndColl(borrower);
+
+      const price = await contracts.priceFeedTestnet.getPrice();
+
+      // newColl = existing coll + topup - withdrawal
+      const newColl = coll.add(collTopUp).sub(collWithdrawal);
+
+      const targetDebt = newColl.mul(price).div(ICR);
+      assert(targetDebt.gt(debt), "ICR is already greater than or equal to target");
+
+      increasedTotalDebt = targetDebt.sub(debt);
+      zusdAmount = await this.getNetBorrowingAmount(contracts, increasedTotalDebt);
+    }
+
+    // If debt increase, compute (a) borrowing-fee-inclusive debt increase and (b) buffer fee in RBTC
+    let bufferFee = this.toBN(0);
+
+    if (isDebtIncrease) {
+      // total debt increase that hits the trove struct includes borrowing fee
+      if (increasedTotalDebt.eq(this.toBN(0))) {
+        increasedTotalDebt = await this.getAmountWithBorrowingFee(contracts, zusdAmount);
+      }
+
+      // IMPORTANT: call options MUST NOT include `value` (getRedemptionBufferFeeRBTC is nonpayable)
+      const fromForCall = extraParams.from ? extraParams.from : this.ZERO_ADDRESS;
+      bufferFee = await this.getRedemptionBufferFeeRBTC(contracts, zusdAmount, fromForCall);
+
+      // msg.value must cover buffer fee + optional collateral top-up
+      extraParams.value = collTopUp.add(bufferFee);
+    } else {
+      // no buffer fee needed
+      extraParams.value = collTopUp;
+    }
+
+    const tx = await contracts.borrowerOperations.adjustTrove(
+      maxFeePercentage,
+      collWithdrawal,
+      zusdAmount,
+      isDebtIncrease,
+      upperHint,
+      lowerHint,
+      extraParams
+    );
+
+    return {
+      tx,
+      zusdAmount,
+      increasedTotalDebt,
+      collTopUp,
+      bufferFee
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // NUE / DLLR helpers
+  // -------------------------------------------------------------------------
+
+  static _emptyMassetPermitParams() {
+    return {
+      deadline: 0,
+      v: 0,
+      r: "0x" + "0".repeat(64),
+      s: "0x" + "0".repeat(64)
+    };
+  }
+
+  static _emptyPermit2PermitTransferFrom() {
+    // ISignatureTransfer.PermitTransferFrom:
+    // { permitted: { token, amount }, nonce, deadline }
+    return {
+      permitted: { token: this.ZERO_ADDRESS, amount: 0 },
+      nonce: 0,
+      deadline: 0
+    };
+  }
+
+  static _normalizePermit2PermitTransferFrom(permit) {
+    // Web3/Truffle is happiest with tuple-arrays. Support both object + tuple input.
+    if (Array.isArray(permit)) return permit;
+
+    const token = permit.permitted.token;
+    const amount = permit.permitted.amount;
+    const nonce = permit.nonce;
+    const deadline = permit.deadline;
+
+    return [[token, amount], nonce, deadline];
+  }
+
+  /**
+   * adjustNueTrove(): wrapper around BorrowerOperations.adjustNueTrove.
+   *
+   * IMPORTANT SEMANTICS (based on your contract):
+   * - if isDebtIncrease == true: `_ZUSDChange` is the ZUSD amount to mint (then converted to DLLR)
+   * - if isDebtIncrease == false: `_ZUSDChange` is treated as a DLLR amount by the contract (repay via DLLR)
+   *
+   * This helper:
+   * - adds RedemptionBuffer fee to msg.value for debt increases
+   * - treats extraParams.value as collateral top-up *excluding* buffer fee
+   */
+  static async adjustNueTrove(
+    contracts,
+    {
+      maxFeePercentage,
+      collWithdrawal,
+      zusdAmount,      // for debt increase
+      dllrAmount,      // for repayment (isDebtIncrease=false)
+      ICR,
+      isDebtIncrease,
+      upperHint,
+      lowerHint,
+      permitParams,
+      extraParams
+    }
+  ) {
+    if (!extraParams) extraParams = {};
+    if (!maxFeePercentage) maxFeePercentage = this._100pct;
+    if (!upperHint) upperHint = this.ZERO_ADDRESS;
+    if (!lowerHint) lowerHint = this.ZERO_ADDRESS;
+    if (collWithdrawal === undefined) collWithdrawal = this.toBN(0);
+    else collWithdrawal = this.toBN(collWithdrawal);
+
+    // default permit params (unused in borrow path, required by ABI)
+    if (!permitParams) permitParams = this._emptyMassetPermitParams();
+
+    // Determine the "amount" argument passed to the contract
+    let amount;
+    if (isDebtIncrease === undefined) {
+      // infer: if zusdAmount provided -> increase; else if dllrAmount provided -> repay
+      isDebtIncrease = !!zusdAmount;
+    }
+
+    if (isDebtIncrease) {
+      // debt increase uses zusdAmount
+      if (zusdAmount === undefined) zusdAmount = this.toBN(0);
+      zusdAmount = (typeof zusdAmount === "string") ? this.toBN(zusdAmount) : this.toBN(zusdAmount);
+
+      // Collateral topup intended for trove (excluding buffer fee)
+      let collTopUp = extraParams.value ? this.toBN(extraParams.value) : this.toBN(0);
+
+      // ICR targeting supported (borrow only)
+      let increasedTotalDebt = this.toBN(0);
+      if (ICR) {
+        assert(extraParams.from, "A 'from' account is needed");
+        ICR = (typeof ICR === "string") ? this.toBN(ICR) : this.toBN(ICR);
+
+        const borrower = this._getBorrowerAddress(contracts, extraParams.from);
+        const { debt, coll } = await contracts.troveManager.getEntireDebtAndColl(borrower);
+
+        const price = await contracts.priceFeedTestnet.getPrice();
+        const newColl = coll.add(collTopUp).sub(collWithdrawal);
+
+        const targetDebt = newColl.mul(price).div(ICR);
+        assert(targetDebt.gt(debt), "ICR is already greater than or equal to target");
+
+        increasedTotalDebt = targetDebt.sub(debt);
+        zusdAmount = await this.getNetBorrowingAmount(contracts, increasedTotalDebt);
+      }
+
+      // compute buffer fee based on minted ZUSD
+      const fromForCall = extraParams.from ? extraParams.from : this.ZERO_ADDRESS;
+      const bufferFee = await this.getRedemptionBufferFeeRBTC(contracts, zusdAmount, fromForCall);
+
+
+      extraParams.value = collTopUp.add(bufferFee);
+
+      amount = zusdAmount;
+
+      const tx = await contracts.borrowerOperations.adjustNueTrove(
+        maxFeePercentage,
+        collWithdrawal,
+        amount,
+        true,
+        upperHint,
+        lowerHint,
+        permitParams,
+        extraParams
+      );
+
+      return { tx, zusdAmount: amount, collTopUp, bufferFee };
+    } else {
+      // repayment path uses dllrAmount (contract treats `_ZUSDChange` as DLLR amount in this case)
+      if (dllrAmount === undefined) {
+        // allow reusing zusdAmount field as the "repay amount" if caller didn't supply dllrAmount
+        dllrAmount = zusdAmount;
+      }
+      if (dllrAmount === undefined) dllrAmount = this.toBN(0);
+      dllrAmount = (typeof dllrAmount === "string") ? this.toBN(dllrAmount) : this.toBN(dllrAmount);
+
+      // no buffer fee
+      extraParams.value = extraParams.value ? this.toBN(extraParams.value) : this.toBN(0);
+
+      amount = dllrAmount;
+
+      const tx = await contracts.borrowerOperations.adjustNueTrove(
+        maxFeePercentage,
+        collWithdrawal,
+        amount,
+        false,
+        upperHint,
+        lowerHint,
+        permitParams,
+        extraParams
+      );
+
+      return { tx, dllrAmount: amount };
+    }
+  }
+
+  /**
+   * adjustNueTroveWithPermit2(): same logic as adjustNueTrove, but uses Permit2 parameters.
+   * For debt increases, permit/signature are unused but still required by ABI.
+   */
+  static async adjustNueTroveWithPermit2(
+    contracts,
+    {
+      maxFeePercentage,
+      collWithdrawal,
+      zusdAmount,
+      dllrAmount,
+      ICR,
+      isDebtIncrease,
+      upperHint,
+      lowerHint,
+      permit,
+      signature,
+      extraParams
+    }
+  ) {
+    if (!extraParams) extraParams = {};
+    if (!maxFeePercentage) maxFeePercentage = this._100pct;
+    if (!upperHint) upperHint = this.ZERO_ADDRESS;
+    if (!lowerHint) lowerHint = this.ZERO_ADDRESS;
+    if (collWithdrawal === undefined) collWithdrawal = this.toBN(0);
+    else collWithdrawal = this.toBN(collWithdrawal);
+
+    if (!permit) permit = this._emptyPermit2PermitTransferFrom();
+    if (!signature) signature = "0x";
+
+    const permitTuple = this._normalizePermit2PermitTransferFrom(permit);
+
+    // Determine increase vs repay
+    if (isDebtIncrease === undefined) isDebtIncrease = !!zusdAmount;
+
+    if (isDebtIncrease) {
+      if (zusdAmount === undefined) zusdAmount = this.toBN(0);
+      zusdAmount = (typeof zusdAmount === "string") ? this.toBN(zusdAmount) : this.toBN(zusdAmount);
+
+      let collTopUp = extraParams.value ? this.toBN(extraParams.value) : this.toBN(0);
+
+      // ICR targeting supported (borrow only)
+      if (ICR) {
+        assert(extraParams.from, "A 'from' account is needed");
+        ICR = (typeof ICR === "string") ? this.toBN(ICR) : this.toBN(ICR);
+
+        const borrower = this._getBorrowerAddress(contracts, extraParams.from);
+        const { debt, coll } = await contracts.troveManager.getEntireDebtAndColl(borrower);
+
+        const price = await contracts.priceFeedTestnet.getPrice();
+        const newColl = coll.add(collTopUp).sub(collWithdrawal);
+
+        const targetDebt = newColl.mul(price).div(ICR);
+        assert(targetDebt.gt(debt), "ICR is already greater than or equal to target");
+
+        const increasedTotalDebt = targetDebt.sub(debt);
+        zusdAmount = await this.getNetBorrowingAmount(contracts, increasedTotalDebt);
+      }
+
+      const fromForCall = extraParams.from ? extraParams.from : this.ZERO_ADDRESS;
+      const bufferFee = await this.getRedemptionBufferFeeRBTC(contracts, zusdAmount, fromForCall);
+
+      extraParams.value = collTopUp.add(bufferFee);
+
+      const tx = await contracts.borrowerOperations.adjustNueTroveWithPermit2(
+        maxFeePercentage,
+        collWithdrawal,
+        zusdAmount,
+        true,
+        upperHint,
+        lowerHint,
+        permitTuple,
+        signature,
+        extraParams
+      );
+
+      return { tx, zusdAmount, collTopUp, bufferFee };
+    } else {
+      if (dllrAmount === undefined) dllrAmount = zusdAmount;
+      if (dllrAmount === undefined) dllrAmount = this.toBN(0);
+      dllrAmount = (typeof dllrAmount === "string") ? this.toBN(dllrAmount) : this.toBN(dllrAmount);
+
+      extraParams.value = extraParams.value ? this.toBN(extraParams.value) : this.toBN(0);
+
+      const tx = await contracts.borrowerOperations.adjustNueTroveWithPermit2(
+        maxFeePercentage,
+        collWithdrawal,
+        dllrAmount,
+        false,
+        upperHint,
+        lowerHint,
+        permitTuple,
+        signature,
+        extraParams
+      );
+
+      return { tx, dllrAmount };
+    }
+  }
+
+  // If you call withdrawZUSD with no extraParams.value, it will send msg.value = bufferFee automatically.
+  // If you include extraParams.value, it becomes a collateral top-up, and the helper sends collTopUp + bufferFee.
   static async withdrawZUSD(
     contracts,
     { maxFeePercentage, zusdAmount, ICR, upperHint, lowerHint, extraParams }
@@ -847,26 +1322,58 @@ class TestHelper {
     if (!maxFeePercentage) maxFeePercentage = this._100pct;
     if (!upperHint) upperHint = this.ZERO_ADDRESS;
     if (!lowerHint) lowerHint = this.ZERO_ADDRESS;
+    if (!extraParams) extraParams = {};
+
+    // --- normalize inputs to BN (dec(...) returns string) ---
+    if (zusdAmount && typeof zusdAmount === "string") zusdAmount = this.toBN(zusdAmount);
+    if (ICR && typeof ICR === "string") ICR = this.toBN(ICR);
+    if (extraParams.value && typeof extraParams.value === "string") extraParams.value = this.toBN(extraParams.value);
 
     assert(
       !(zusdAmount && ICR) && (zusdAmount || ICR),
       "Specify either zusd amount or target ICR, but not both"
     );
+
+    const collTopUp = extraParams.value ? this.toBN(extraParams.value) : this.toBN(0);
 
     let increasedTotalDebt;
     if (ICR) {
       assert(extraParams.from, "A from account is needed");
-      const { debt, coll } = await contracts.troveManager.getEntireDebtAndColl(extraParams.from);
-      const price = await contracts.priceFeedTestnet.getPrice();
-      const targetDebt = coll.mul(price).div(ICR);
-      assert(targetDebt > debt, "ICR is already greater than or equal to target");
-      increasedTotalDebt = targetDebt.sub(debt);
+
+      const borrower = this._getBorrowerAddress(contracts, extraParams.from);
+      const { debt, coll } = await contracts.troveManager.getEntireDebtAndColl(borrower);
+
+      const price = this.toBN(await contracts.priceFeedTestnet.getPrice());
+
+      const debtBN = this.toBN(debt);
+      const collBN = this.toBN(coll);
+
+      const effectiveColl = collBN.add(collTopUp);
+      const targetDebt = effectiveColl.mul(price).div(ICR);
+
+      assert(targetDebt.gt(debtBN), "ICR is already greater than or equal to target");
+
+      increasedTotalDebt = targetDebt.sub(debtBN);
       zusdAmount = await this.getNetBorrowingAmount(contracts, increasedTotalDebt);
     } else {
+      // zusdAmount is BN here because we normalized it above
       increasedTotalDebt = await this.getAmountWithBorrowingFee(contracts, zusdAmount);
     }
 
-    await contracts.borrowerOperations.withdrawZUSD(
+    // Quote buffer fee and send it on top
+    /*let bufferFee = this.toBN(0);
+    if (contracts.borrowerOperations.getRedemptionBufferFeeRBTC) {
+      const feeCallOpts = extraParams.from ? { from: extraParams.from } : {};
+      bufferFee = this.toBN(
+        await contracts.borrowerOperations.getRedemptionBufferFeeRBTC.call(zusdAmount, feeCallOpts)
+      );
+    }*/
+    const bufferFee = await this.getRedemptionBufferFeeRBTC(contracts, zusdAmount, extraParams.from);
+
+    const totalValue = collTopUp.add(bufferFee);
+    extraParams.value = totalValue;
+
+    const tx = await contracts.borrowerOperations.withdrawZUSD(
       maxFeePercentage,
       zusdAmount,
       upperHint,
@@ -874,56 +1381,102 @@ class TestHelper {
       extraParams
     );
 
-    return {
-      zusdAmount,
-      increasedTotalDebt
-    };
+    return { zusdAmount, increasedTotalDebt, collTopUp, bufferFee, totalValue, tx };
   }
 
-  static async withdrawZusdAndConvertToDLLR(contracts, { maxFeePercentage, zusdAmount, ICR, upperHint, lowerHint, extraParams }) {
-    //TODO: implement
+  static async withdrawZusdAndConvertToDLLR(
+    contracts,
+    { maxFeePercentage, zusdAmount, ICR, upperHint, lowerHint, extraParams }
+  ) {
     if (!maxFeePercentage) maxFeePercentage = this._100pct;
     if (!upperHint) upperHint = this.ZERO_ADDRESS;
     if (!lowerHint) lowerHint = this.ZERO_ADDRESS;
+    if (!extraParams) extraParams = {};
+
+    // --- normalize inputs to BN (dec(...) returns string) ---
+    if (zusdAmount && typeof zusdAmount === "string") zusdAmount = this.toBN(zusdAmount);
+    if (ICR && typeof ICR === "string") ICR = this.toBN(ICR);
+    if (extraParams.value && typeof extraParams.value === "string") extraParams.value = this.toBN(extraParams.value);
 
     assert(
       !(zusdAmount && ICR) && (zusdAmount || ICR),
       "Specify either zusd amount or target ICR, but not both"
     );
 
+    const collTopUp = extraParams.value ? this.toBN(extraParams.value) : this.toBN(0);
+
     let increasedTotalDebt;
+
     if (ICR) {
       assert(extraParams.from, "A 'from' account is needed");
-      const { debt, coll } = await contracts.troveManager.getEntireDebtAndColl(extraParams.from);
+      if (typeof ICR == "string") ICR = this.toBN(ICR);
+
+      const borrower = this._getBorrowerAddress(contracts, extraParams.from);
+      const { debt, coll } = await contracts.troveManager.getEntireDebtAndColl(borrower);
+
       const price = await contracts.priceFeedTestnet.getPrice();
-      const targetDebt = coll.mul(price).div(ICR);
-      assert(targetDebt > debt, "ICR is already greater than or equal to target");
-      increasedTotalDebt = targetDebt.sub(debt);
+
+      const effectiveColl = this.toBN(coll).add(collTopUp);
+      const targetDebt = effectiveColl.mul(price).div(ICR);
+
+      assert(targetDebt.gt(this.toBN(debt)), "ICR is already greater than or equal to target");
+
+      increasedTotalDebt = targetDebt.sub(this.toBN(debt));
       zusdAmount = await this.getNetBorrowingAmount(contracts, increasedTotalDebt);
     } else {
       increasedTotalDebt = await this.getAmountWithBorrowingFee(contracts, zusdAmount);
     }
 
-    //TODO: fix callStatic - 
+    // --- NEW: redemption buffer fee on ZUSD minting ---
+    const bufferFee = await this.getRedemptionBufferFeeRBTC(contracts, zusdAmount, extraParams.from);
+
+
+    const totalValue = collTopUp.add(bufferFee);
+
+    // Use ethers for return value (DLLR amount)
     const { ethers } = hre;
+
+    // Pick signer based on extraParams.from if provided
+    const signers = await ethers.getSigners();
+    let signer = signers[0];
+
+    if (extraParams.from) {
+      const want = extraParams.from.toLowerCase();
+      for (const s of signers) {
+        const addr = (s.address ? s.address : await s.getAddress()).toLowerCase();
+        if (addr === want) {
+          signer = s;
+          break;
+        }
+      }
+    }
+
     const ethersBorrowerOperations = await ethers.getContractAt(
       "BorrowerOperationsTester",
-      contracts.borrowerOperations.address, (await ethers.getSigners())[1]
+      contracts.borrowerOperations.address,
+      signer
     );
+
+    // Build ethers overrides: remove `from` (ethers signer already sets it)
+    const overrides = { ...extraParams };
+    delete overrides.from;
+    overrides.value = totalValue.toString();
+
+    // NOTE: ethers v6 uses `.staticCall(...)`
     const dllrAmount = await ethersBorrowerOperations.withdrawZusdAndConvertToDLLR.staticCall(
-      maxFeePercentage,
+      maxFeePercentage.toString(),
       zusdAmount.toString(),
       upperHint,
       lowerHint,
-      extraParams
+      overrides
     );
 
     await ethersBorrowerOperations.withdrawZusdAndConvertToDLLR(
-      maxFeePercentage,
+      maxFeePercentage.toString(),
       zusdAmount.toString(),
       upperHint,
       lowerHint,
-      extraParams
+      overrides
     );
 
     return {
@@ -932,6 +1485,9 @@ class TestHelper {
       lowerHint,
       zusdAmount,
       increasedTotalDebt,
+      collTopUp,
+      bufferFee,
+      totalValue,
       dllrAmount
     };
   }
@@ -1430,14 +1986,14 @@ class TestHelper {
     for (const redeemer of accounts) {
       const randZUSDAmount = this.randAmountInWei(min, max);
 
-      await this.performRedemptionTx(redeemer, price, contracts, randZUSDAmount);
+      const tx = await this.performRedemptionTx(redeemer, price, contracts, randZUSDAmount);
       const gas = this.gasUsed(tx);
       gasCostList.push(gas);
     }
     return this.getGasMetrics(gasCostList);
   }
 
-  static async performRedemptionTx(redeemer, price, contracts, ZUSDAmount, maxFee = 0) {
+  /*static async performRedemptionTx(redeemer, price, contracts, ZUSDAmount, maxFee = 0) {
     const redemptionhint = await contracts.hintHelpers.getRedemptionHints(ZUSDAmount, price, 0);
 
     const firstRedemptionHint = redemptionhint[0];
@@ -1459,6 +2015,14 @@ class TestHelper {
       approxPartialRedemptionHint
     );
 
+    // Ensure TroveManager can transferFrom redeemer for the buffer stage
+    await contracts.zusdToken.approve(
+      contracts.troveManager.address,
+      ZUSDAmount,
+      { from: redeemer }
+    );
+
+
     const tx = await contracts.troveManager.redeemCollateral(
       ZUSDAmount,
       firstRedemptionHint,
@@ -1471,7 +2035,98 @@ class TestHelper {
     );
 
     return tx;
+  }*/
+
+  static async performRedemptionTx(redeemer, price, contracts, ZUSDAmount, maxFee = 0) {
+    const toBN = web3.utils.toBN;
+
+    const amountBN = toBN(ZUSDAmount);
+    const priceBN = toBN(price);
+
+    // ------------------------------------------------------------------
+    // Mirror TroveManagerRedeemOps._swapFromBuffer() to know "remainingZUSD"
+    // ------------------------------------------------------------------
+    let bufferBal = toBN("0");
+    if (contracts.redemptionBuffer && contracts.redemptionBuffer.getBalance) {
+      bufferBal = toBN(await contracts.redemptionBuffer.getBalance());
+    } else if (contracts.redemptionBuffer && contracts.redemptionBuffer.address) {
+      bufferBal = toBN(await web3.eth.getBalance(contracts.redemptionBuffer.address));
+    }
+
+    const DECIMAL_PRECISION = MoneyValues._1e18BN; // IMPORTANT: correct 1e18 BN
+
+    const maxZusdFromBuffer = bufferBal.mul(priceBN).div(DECIMAL_PRECISION);
+    const zusdFromBuffer = amountBN.lt(maxZusdFromBuffer) ? amountBN : maxZusdFromBuffer;
+    const zusdFromTroves = amountBN.sub(zusdFromBuffer);
+
+    // ------------------------------------------------------------------
+    // Approve ONLY the buffer portion (transferFrom in _swapFromBuffer)
+    // ------------------------------------------------------------------
+    if (zusdFromBuffer.gt(toBN("0"))) {
+      // Optional safety: reset allowance first for non-standard ERC20s
+      await contracts.zusdToken.approve(contracts.troveManager.address, 0, { from: redeemer, gasPrice: 0 });
+
+      await contracts.zusdToken.approve(
+        contracts.troveManager.address,
+        zusdFromBuffer,
+        { from: redeemer,
+          gasPrice: 0
+        }
+      );
+    }
+
+    // ------------------------------------------------------------------
+    // Redemption hints MUST be computed for the TROVE portion (remainingZUSD)
+    // ------------------------------------------------------------------
+    let firstRedemptionHint = this.ZERO_ADDRESS;
+    let partialRedemptionNewICR = toBN("0");
+    let upperHint = this.ZERO_ADDRESS;
+    let lowerHint = this.ZERO_ADDRESS;
+
+    if (zusdFromTroves.gt(toBN("0"))) {
+      const redemptionhint = await contracts.hintHelpers.getRedemptionHints(
+        zusdFromTroves,
+        priceBN,
+        0
+      );
+
+      firstRedemptionHint = redemptionhint[0];
+      partialRedemptionNewICR = redemptionhint[1];
+
+      const { hintAddress: approxPartialRedemptionHint, latestRandomSeed } =
+        await contracts.hintHelpers.getApproxHint(
+          partialRedemptionNewICR,
+          50,
+          this.latestRandomSeed
+        );
+
+      this.latestRandomSeed = latestRandomSeed;
+
+      const exactPartialRedemptionHint = await contracts.sortedTroves.findInsertPosition(
+        partialRedemptionNewICR,
+        approxPartialRedemptionHint,
+        approxPartialRedemptionHint
+      );
+
+      upperHint = exactPartialRedemptionHint[0];
+      lowerHint = exactPartialRedemptionHint[1];
+    }
+
+    // IMPORTANT: still pass ORIGINAL amountBN to redeemCollateral()
+    return contracts.troveManager.redeemCollateral(
+      amountBN,
+      firstRedemptionHint,
+      upperHint,
+      lowerHint,
+      partialRedemptionNewICR,
+      0,
+      maxFee,
+      { from: redeemer, gasPrice: 0 }
+    );
   }
+
+
+
 
   // --- Composite functions ---
 

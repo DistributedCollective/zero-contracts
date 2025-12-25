@@ -4,9 +4,16 @@ pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
 import "../Dependencies/Mynt/IMassetManager.sol";
+import "./IRedemptionBuffer.sol";
 import { IPermit2, ISignatureTransfer } from "./IPermit2.sol";
 
-/// Common interface for the Trove Manager.
+/// @title IBorrowerOperations
+/// @notice External interface for BorrowerOperations (opening/adjusting/closing troves).
+/// @dev
+///  Redemptions are handled by TroveManager/TroveManagerRedeemOps, but BorrowerOperations is
+///  responsible for issuing debt and collecting:
+///   - the normal ZUSD borrowing fee (paid in ZUSD and minted to FeeDistributor)
+///   - the RedemptionBuffer fee (paid in RBTC and deposited into RedemptionBuffer)
 interface IBorrowerOperations {
     // --- Events ---
 
@@ -21,6 +28,12 @@ interface IBorrowerOperations {
     event SortedTrovesAddressChanged(address _sortedTrovesAddress);
     event ZUSDTokenAddressChanged(address _zusdTokenAddress);
     event ZEROStakingAddressChanged(address _zeroStakingAddress);
+    /// @notice Emitted when the Mynt/mAsset manager is configured.
+    event MassetManagerAddressChanged(address _massetManagerAddress);
+    /// @notice Emitted when the RedemptionBuffer contract address is updated.
+    event RedemptionBufferAddressChanged(address _redemptionBufferAddress);
+    /// @notice Emitted when the redemption buffer rate is updated.
+    event RedemptionBufferRateChanged(uint256 _redemptionBufferRate);
 
     event TroveCreated(address indexed _borrower, uint256 arrayIndex);
     event TroveUpdated(
@@ -64,6 +77,45 @@ interface IBorrowerOperations {
         address _zusdTokenAddress,
         address _zeroStakingAddress
     ) external;
+
+    /// @notice Sets the Mynt/mAsset manager used for NUE/DLLR flows.
+    /// @dev Owner/governance only in implementation.
+    function setMassetManagerAddress(address _massetManagerAddress) external;
+    
+    // --- RedemptionBuffer configuration ---
+
+    /// @notice Sets the RedemptionBuffer contract address.
+    /// @dev Owner/governance only in implementation.
+    function setRedemptionBufferAddress(address _buffer) external;
+
+    /// @notice Sets the redemption buffer rate used to compute the RBTC fee.
+    /// @dev 1e18 precision; 1e18 == 100%. Owner/governance only in implementation.
+    function setRedemptionBufferRate(uint256 _rate) external;
+
+    /// @notice Returns the configured RedemptionBuffer contract address.
+    function getRedemptionBufferAddress() external view returns (address);
+
+    /// @notice Returns the configured redemption buffer rate (1e18 precision).
+    function getRedemptionBufferRate() external view returns (uint256);
+
+    // --- RedemptionBuffer fee quoting ---
+
+    /// @notice Quotes the extra RBTC (wei) required on top of collateral when borrowing `_ZUSDAmount`.
+    /// @dev NOT view in many Liquity forks because priceFeed.fetchPrice() is non-view.
+    ///      Frontends should call via eth_call/staticcall.
+    function getRedemptionBufferFeeRBTC(uint256 _ZUSDAmount) external returns (uint256);
+
+    /// @notice View-only quote that uses a caller-supplied price.
+    /// @dev Lets frontends avoid calling BorrowerOperations.getRedemptionBufferFeeRBTC()
+    ///      if they already have a price from elsewhere. The implementation should mirror the
+    ///      exact arithmetic (including rounding) used by openTrove/adjustTrove.
+    /// @param _ZUSDAmount Amount of new ZUSD debt being minted (not including borrowing fee).
+    /// @param _price Oracle price in 1e18 precision (RBTC/USD or RBTC/ZUSD face-value model).
+    /// @return feeRBTC Extra RBTC (wei) required as the redemption buffer fee.
+    function getRedemptionBufferFeeRBTCWithPrice(uint256 _ZUSDAmount, uint256 _price)
+        external
+        view
+        returns (uint256 feeRBTC);
 
     /**
      * @notice payable function that creates a Trove for the caller with the requested debt, and the Ether received as collateral.
@@ -129,6 +181,7 @@ interface IBorrowerOperations {
      * @notice issues `_amount` of ZUSD from the caller’s Trove to the caller.
      * Executes only if the Trove's collateralization ratio would remain above the minimum, and the resulting total collateralization ratio is above 150%.
      * The borrower has to provide a `_maxFeePercentage` that he/she is willing to accept in case of a fee slippage, i.e. when a redemption transaction is processed first, driving up the issuance fee.
+     * When increasing debt and redemptionBufferRate > 0, caller must send msg.value at least equal to the redemption buffer fee; quote via getRedemptionBufferFeeRBTC().
      * @param _maxFee max fee percentage to acept in case of a fee slippage
      * @param _amount ZUSD amount to withdraw
      * @param _upperHint upper trove id hint
@@ -139,15 +192,16 @@ interface IBorrowerOperations {
         uint256 _amount,
         address _upperHint,
         address _lowerHint
-    ) external;
+    ) external payable;
 
     /// Borrow (withdraw) ZUSD tokens from a trove: mint new ZUSD tokens to the owner and convert it to DLLR in one transaction
+    /// When increasing debt and redemptionBufferRate > 0, caller must send msg.value at least equal to the redemption buffer fee; quote via getRedemptionBufferFeeRBTC().
     function withdrawZusdAndConvertToDLLR(
         uint256 _maxFeePercentage,
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external returns (uint256);
+    ) external payable returns (uint256);
 
     /// @notice repay `_amount` of ZUSD to the caller’s Trove, subject to leaving 50 debt in the Trove (which corresponds to the 50 ZUSD gas compensation).
     /// @param _amount ZUSD amount to repay

@@ -16,6 +16,7 @@ import "./Dependencies/console.sol";
 import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
 import "./Interfaces/IPermit2.sol";
+import "./Interfaces/IRedemptionBuffer.sol";
 
 contract BorrowerOperations is
     LiquityBase,
@@ -25,6 +26,19 @@ contract BorrowerOperations is
 {
     /** CONSTANT / IMMUTABLE VARIABLE ONLY */
     IPermit2 public immutable permit2;
+
+    // ---------------------------------------------------------------------
+    // Reentrancy guard
+    // ---------------------------------------------------------------------
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+
+    modifier nonReentrant() {
+        require(_reentrancyStatus != _ENTERED, "BorrowerOps: reentrant call");
+        _reentrancyStatus = _ENTERED;
+        _;
+        _reentrancyStatus = _NOT_ENTERED;
+    }
 
     /* --- Variable container structs  ---
 
@@ -84,6 +98,8 @@ contract BorrowerOperations is
     event ZUSDTokenAddressChanged(address _zusdTokenAddress);
     event ZEROStakingAddressChanged(address _zeroStakingAddress);
     event MassetManagerAddressChanged(address _massetManagerAddress);
+    event RedemptionBufferAddressChanged(address _redemptionBufferAddress);
+    event RedemptionBufferRateChanged(uint256 _redemptionBufferRate);
 
     event TroveCreated(address indexed _borrower, uint256 arrayIndex);
     event TroveUpdated(
@@ -98,6 +114,7 @@ contract BorrowerOperations is
     /** Constructor */
     constructor(address _permit2) public {
         permit2 = IPermit2(_permit2);
+        _reentrancyStatus = _NOT_ENTERED;
     }
 
     // --- Dependency setters ---
@@ -159,9 +176,67 @@ contract BorrowerOperations is
         emit ZEROStakingAddressChanged(_zeroStakingAddress);
     }
 
-    function setMassetManagerAddress(address _massetManagerAddress) external onlyOwner {
+    function setMassetManagerAddress(address _massetManagerAddress) external override onlyOwner {
         massetManager = IMassetManager(_massetManagerAddress);
         emit MassetManagerAddressChanged(_massetManagerAddress);
+    }
+
+    function setRedemptionBufferAddress(address _buffer) external override onlyOwner {
+        require(_buffer != address(0), "BorrowerOps: zero buffer address");
+        checkContract(_buffer);
+        redemptionBuffer = IRedemptionBuffer(_buffer);
+        emit RedemptionBufferAddressChanged(_buffer);
+    }
+
+    function setRedemptionBufferRate(uint256 _rate) external override onlyOwner {
+        require(_rate <= DECIMAL_PRECISION, "BorrowerOps: buffer rate too high");
+        if (_rate > 0) {
+            require(address(redemptionBuffer) != address(0), "BorrowerOps: buffer not set");
+        }
+        redemptionBufferRate = _rate;
+        emit RedemptionBufferRateChanged(_rate);
+    }
+
+    /// @notice Returns the configured RedemptionBuffer contract.
+    function getRedemptionBufferAddress() external view override returns (address) {
+        return address(redemptionBuffer);
+    }
+
+    /// @notice Returns the configured redemption buffer rate (1e18 precision).
+    function getRedemptionBufferRate() external view override returns (uint256) {
+        return redemptionBufferRate;
+    }
+
+    /// @notice Returns the extra RBTC (in wei) that must be sent on top of collateral
+    ///         when opening a trove borrowing `_ZUSDAmount`.
+    /// @dev Uses priceFeed.fetchPrice() to match the exact pricing logic used by openTrove.
+    ///      This function is NOT marked view because fetchPrice() is typically non-view in Liquity-style feeds.
+    ///      UIs should call it using eth_call / staticcall.
+    function getRedemptionBufferFeeRBTC(uint256 _ZUSDAmount) external override returns (uint256) {
+        if (redemptionBufferRate == 0) {
+            return 0;
+        }
+
+        // Optional: keep this require if you want misconfiguration to be loud.
+        require(address(redemptionBuffer) != address(0), "BorrowerOps: buffer not set");
+
+        uint256 price = priceFeed.fetchPrice();
+        return _calcRedemptionBufferFeeRBTC(_ZUSDAmount, price);
+    }
+
+    /// @notice View-only fee quote when caller supplies a price.
+    /// @dev Lets UIs avoid calling fetchPrice() from this contract.
+    function getRedemptionBufferFeeRBTCWithPrice(uint256 _ZUSDAmount, uint256 _price)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        if (redemptionBufferRate == 0) {
+            return 0;
+        }
+        require(_price > 0, "BorrowerOps: invalid price");
+        return _calcRedemptionBufferFeeRBTC(_ZUSDAmount, _price);
     }
 
     function openTrove(
@@ -169,7 +244,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         _openTrove(_maxFeePercentage, _ZUSDAmount, _upperHint, _lowerHint, msg.sender);
     }
 
@@ -178,7 +253,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         require(address(massetManager) != address(0), "Masset address not set");
 
         _openTrove(_maxFeePercentage, _ZUSDAmount, _upperHint, _lowerHint, address(this));
@@ -190,6 +265,29 @@ contract BorrowerOperations is
     }
 
     // --- Borrower Trove Operations ---
+    function _ceilDiv(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) return 0;
+        return ((a - 1) / b) + 1;
+    }
+
+    function _calcRedemptionBufferFeeRBTC(uint256 _zusdAmount, uint256 _price)
+        internal
+        view
+        returns (uint256)
+    {
+        if (redemptionBufferRate == 0) return 0;
+
+        // Defensive: if you ever set a rate, buffer must be configured
+        require(address(redemptionBuffer) != address(0), "BorrowerOps: buffer not set");
+        require(_price > 0, "BorrowerOps: invalid price");
+
+        // feeZUSD = ZUSD * rate / 1e18
+        uint256 feeZUSD = _zusdAmount.mul(redemptionBufferRate).div(DECIMAL_PRECISION);
+
+        // feeRBTC = ceil(feeZUSD * 1e18 / price)
+        return _ceilDiv(feeZUSD.mul(DECIMAL_PRECISION), _price);
+    }
+
     function _openTrove(
         uint256 _maxFeePercentage,
         uint256 _ZUSDAmount,
@@ -224,15 +322,22 @@ contract BorrowerOperations is
         vars.compositeDebt = _getCompositeDebt(vars.netDebt);
         assert(vars.compositeDebt > 0);
 
-        vars.ICR = LiquityMath._computeCR(msg.value, vars.compositeDebt, vars.price);
-        vars.NICR = LiquityMath._computeNominalCR(msg.value, vars.compositeDebt);
+        // --- NEW: calculate buffer fee (RBTC) and keep trove collateral "as intended" ---
+        uint256 bufferFee = _calcRedemptionBufferFeeRBTC(_ZUSDAmount, vars.price);
+        require(msg.value > bufferFee, "BorrowerOps: insufficient RBTC for collateral+fee");
+
+        uint256 coll = msg.value.sub(bufferFee);
+        require(coll > 0, "BorrowerOps: collateral must be > 0");
+
+        vars.ICR = LiquityMath._computeCR(coll, vars.compositeDebt, vars.price);
+        vars.NICR = LiquityMath._computeNominalCR(coll, vars.compositeDebt);
 
         if (isRecoveryMode) {
             _requireICRisAboveCCR(vars.ICR);
         } else {
             _requireICRisAboveMCR(vars.ICR);
             uint256 newTCR = _getNewTCRFromTroveChange(
-                msg.value,
+                coll,
                 true,
                 vars.compositeDebt,
                 true,
@@ -243,7 +348,7 @@ contract BorrowerOperations is
 
         // Set the trove struct's properties
         contractsCache.troveManager.setTroveStatus(msg.sender, 1);
-        contractsCache.troveManager.increaseTroveColl(msg.sender, msg.value);
+        contractsCache.troveManager.increaseTroveColl(msg.sender, coll);
         contractsCache.troveManager.increaseTroveDebt(msg.sender, vars.compositeDebt);
 
         contractsCache.troveManager.updateTroveRewardSnapshots(msg.sender);
@@ -253,8 +358,15 @@ contract BorrowerOperations is
         vars.arrayIndex = contractsCache.troveManager.addTroveOwnerToArray(msg.sender);
         emit TroveCreated(msg.sender, vars.arrayIndex);
 
-        // Move the ether to the Active Pool, and mint the ZUSDAmount to the borrower
-        _activePoolAddColl(contractsCache.activePool, msg.value);
+        // Move collateral to Active Pool
+        _activePoolAddColl(contractsCache.activePool, coll);
+
+        // NEW: send the fee to the RedemptionBuffer
+        if (bufferFee > 0) {
+            redemptionBuffer.deposit{ value: bufferFee }();
+        }
+
+        // Mint the ZUSDAmount to the borrower
         _mintZusdAndIncreaseActivePoolDebt(
             contractsCache.activePool,
             contractsCache.zusdToken,
@@ -262,6 +374,7 @@ contract BorrowerOperations is
             _ZUSDAmount,
             vars.netDebt
         );
+
         // Move the ZUSD gas compensation to the Gas Pool
         _mintZusdAndIncreaseActivePoolDebt(
             contractsCache.activePool,
@@ -274,7 +387,7 @@ contract BorrowerOperations is
         emit TroveUpdated(
             msg.sender,
             vars.compositeDebt,
-            msg.value,
+            coll,
             vars.stake,
             BorrowerOperation.openTrove
         );
@@ -282,7 +395,7 @@ contract BorrowerOperations is
     }
 
     /// Send ETH as collateral to a trove
-    function addColl(address _upperHint, address _lowerHint) external payable override {
+    function addColl(address _upperHint, address _lowerHint) external payable override nonReentrant {
         _adjustTrove(msg.sender, 0, 0, false, _upperHint, _lowerHint, 0);
     }
 
@@ -291,7 +404,7 @@ contract BorrowerOperations is
         address _borrower,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         _requireCallerIsStabilityPool();
         _adjustTrove(_borrower, 0, 0, false, _upperHint, _lowerHint, 0);
     }
@@ -301,7 +414,7 @@ contract BorrowerOperations is
         uint256 _collWithdrawal,
         address _upperHint,
         address _lowerHint
-    ) external override {
+    ) external override nonReentrant {
         _adjustTrove(msg.sender, _collWithdrawal, 0, false, _upperHint, _lowerHint, 0);
     }
 
@@ -311,7 +424,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external override {
+    ) external payable override nonReentrant {
         _adjustTrove(msg.sender, 0, _ZUSDAmount, true, _upperHint, _lowerHint, _maxFeePercentage);
     }
 
@@ -323,7 +436,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external override returns (uint256) {
+    ) external payable override nonReentrant returns (uint256) {
         address thisAddress = address(this);
         uint256 balanceBefore = zusdToken.balanceOf(thisAddress);
 
@@ -352,7 +465,7 @@ contract BorrowerOperations is
         uint256 _ZUSDAmount,
         address _upperHint,
         address _lowerHint
-    ) external override {
+    ) external override nonReentrant {
         _adjustTrove(msg.sender, 0, _ZUSDAmount, false, _upperHint, _lowerHint, 0);
     }
 
@@ -362,7 +475,7 @@ contract BorrowerOperations is
         address _upperHint,
         address _lowerHint,
         IMassetManager.PermitParams calldata _permitParams
-    ) external override {
+    ) external override nonReentrant {
         _adjustNueTrove(0, 0, _dllrAmount, false, _upperHint, _lowerHint, _permitParams);
     }
 
@@ -373,7 +486,7 @@ contract BorrowerOperations is
         address _lowerHint,
         ISignatureTransfer.PermitTransferFrom memory _permit,
         bytes calldata _signature
-    ) external override {
+    ) external override nonReentrant {
         _adjustNueTroveWithPermit2(0, 0, _dllrAmount, false, _upperHint, _lowerHint, _permit, _signature);
     }
 
@@ -384,7 +497,7 @@ contract BorrowerOperations is
         bool _isDebtIncrease,
         address _upperHint,
         address _lowerHint
-    ) external payable override {
+    ) external payable override nonReentrant {
         _adjustTrove(
             msg.sender,
             _collWithdrawal,
@@ -405,7 +518,7 @@ contract BorrowerOperations is
         address _upperHint,
         address _lowerHint,
         IMassetManager.PermitParams calldata _permitParams
-    ) external payable override {
+    ) external payable override nonReentrant {
         _adjustNueTrove(
             _maxFeePercentage,
             _collWithdrawal,
@@ -427,7 +540,7 @@ contract BorrowerOperations is
         address _lowerHint,
         ISignatureTransfer.PermitTransferFrom memory _permit,
         bytes calldata _signature
-    ) external payable override {
+    ) external payable override nonReentrant {
         _adjustNueTroveWithPermit2(
             _maxFeePercentage,
             _collWithdrawal,
@@ -585,15 +698,29 @@ contract BorrowerOperations is
         vars.price = priceFeed.fetchPrice();
         vars.isRecoveryMode = _checkRecoveryMode(vars.price);
 
+        // --- NEW: redemption buffer fee on ZUSD minting (debt increase) ---
+        uint256 collTopUp = msg.value;  // actual collateral top-up (excludes fee)
+        uint256 bufferFee = 0;
+
         if (_isDebtIncrease) {
             _requireValidMaxFeePercentage(_maxFeePercentage, vars.isRecoveryMode);
             _requireNonZeroDebtChange(_ZUSDChange);
+
+            // fee is based on the *newly minted* ZUSD amount (same idea as openTrove)
+            bufferFee = _calcRedemptionBufferFeeRBTC(_ZUSDChange, vars.price);
+
+            require(msg.value >= bufferFee, "BorrowerOps: insufficient RBTC for buffer fee");
+            collTopUp = msg.value.sub(bufferFee);
         }
-        _requireSingularCollChange(_collWithdrawal);
+
+        // If both are positive (excluding fee), revert
+        require(!(collTopUp > 0 && _collWithdrawal > 0), "BorrowerOps: cannot add and withdraw coll");
+
         _requireNonZeroAdjustment(_collWithdrawal, _ZUSDChange);
         _requireTroveisActive(contractsCache.troveManager, _borrower);
 
-        // Confirm the operation is either a borrower adjusting their own trove, or a pure ETH transfer from the Stability Pool to a trove
+        // Confirm the operation is either a borrower adjusting their own trove,
+        // or a pure ETH transfer from the Stability Pool to a trove
         assert(
             msg.sender == _borrower ||
                 (msg.sender == stabilityPoolAddress && msg.value > 0 && _ZUSDChange == 0)
@@ -601,8 +728,9 @@ contract BorrowerOperations is
 
         contractsCache.troveManager.applyPendingRewards(_borrower);
 
-        // Get the collChange based on whether or not ETH was sent in the transaction
-        (vars.collChange, vars.isCollIncrease) = _getCollChange(msg.value, _collWithdrawal);
+        // Get the collChange based on whether or not ETH was sent in the transaction.
+        // IMPORTANT: use collTopUp (msg.value minus fee), not msg.value.
+        (vars.collChange, vars.isCollIncrease) = _getCollChange(collTopUp, _collWithdrawal);
 
         vars.netDebtChange = _ZUSDChange;
 
@@ -690,13 +818,18 @@ contract BorrowerOperations is
             vars.netDebtChange,
             _tokensRecipient
         );
+
+        // --- NEW: send the buffer fee (RBTC) to RedemptionBuffer ---
+        if (_isDebtIncrease && bufferFee > 0) {
+            redemptionBuffer.deposit{ value: bufferFee }();
+        }
     }
 
-    function closeTrove() external override {
+    function closeTrove() external override nonReentrant {
         _closeTrove();
     }
 
-    function closeNueTrove(IMassetManager.PermitParams calldata _permitParams) external override {
+    function closeNueTrove(IMassetManager.PermitParams calldata _permitParams) external override nonReentrant {
         require(address(massetManager) != address(0), "Masset address not set");
 
         uint256 debt = troveManager.getTroveDebt(msg.sender);
@@ -710,7 +843,7 @@ contract BorrowerOperations is
         _closeTrove();
     }
 
-    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom memory _permit, bytes calldata _signature) external override {
+    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom memory _permit, bytes calldata _signature) external override nonReentrant {
         require(address(massetManager) != address(0), "Masset address not set");
 
         uint256 debt = troveManager.getTroveDebt(msg.sender);
@@ -775,7 +908,7 @@ contract BorrowerOperations is
     /**
      * Claim remaining collateral from a redemption or from a liquidation with ICR > MCR in Recovery Mode
      */
-    function claimCollateral() external override {
+    function claimCollateral() external override nonReentrant {
         // send ETH from CollSurplus Pool to owner
         collSurplusPool.claimColl(msg.sender);
     }
@@ -857,6 +990,11 @@ contract BorrowerOperations is
             );
         } else {
             _burnZusdAndDecreaseActivePoolDebt(_activePool, _zusdToken, _borrower, _ZUSDChange);
+        }
+
+        // Prevent 0-value external calls
+        if (_collChange == 0) {
+            return;
         }
 
         if (_isCollIncrease) {
