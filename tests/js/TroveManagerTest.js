@@ -64,52 +64,6 @@ contract('TroveManager', async accounts => {
   const openNueTrove = async (params) => th.openNueTrove(contracts, params);
   const withdrawZUSD = async (params) => th.withdrawZUSD(contracts, params);
 
-  const drainRedemptionBufferWithWhale = async () => {
-    await emptyRedemptionBufferAsOwner();
-    /*// Use the same price source your tests are using
-    const price = toBN(await priceFeed.getPrice());
-
-    const bufferBalRBTC = toBN(await contracts.redemptionBuffer.getBalance()); // RBTC wei
-    const drainZUSD = bufferBalRBTC.mul(price).div(mv._1e18BN);               // max ZUSD buffer can cover (floor)
-
-    if (drainZUSD.eq(toBN(0))) return;
-
-    // --- Fund whale with enough ZUSD (scan all accounts, not just alice/bob/carol) ---
-    let whaleBal = toBN(await zusdToken.balanceOf(whale));
-    let needed = drainZUSD.sub(whaleBal);
-
-    if (needed.gt(toBN(0))) {
-      const all = await web3.eth.getAccounts();
-
-      for (const src of all) {
-        if (src === whale) continue;
-
-        const srcBal = toBN(await zusdToken.balanceOf(src));
-        if (srcBal.eq(toBN(0))) continue;
-
-        const send = srcBal.gte(needed) ? needed : srcBal;
-        await zusdToken.transfer(whale, send, { from: src });
-
-        needed = needed.sub(send);
-        if (needed.eq(toBN(0))) break;
-      }
-    }
-
-    whaleBal = toBN(await zusdToken.balanceOf(whale));
-    assert.isTrue(
-      whaleBal.gte(drainZUSD),
-      `whale doesn't have enough ZUSD to drain buffer: have=${whaleBal.toString()} need=${drainZUSD.toString()}`
-    );
-
-    // --- Drain: use the updated redemption helper so allowance/hints match buffer-first redeem ---
-    await th.redeemCollateralAndGetTxObject(whale, contracts, drainZUSD, th._100pct);
-
-    // Optional sanity: after drain, buffer should not be able to cover even 1 wei of ZUSD
-    const bufferAfter = toBN(await contracts.redemptionBuffer.getBalance());
-    const maxZusdAfter = bufferAfter.mul(price).div(mv._1e18BN);
-    assert.equal(maxZusdAfter.toString(), "0");*/
-  };
-
   const emptyRedemptionBufferAsOwner = async () => {
     const bufferBal = toBN(await contracts.redemptionBuffer.getBalance());
     if (bufferBal.eq(toBN(0))) return;
@@ -2473,7 +2427,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     const nonce = th.generateNonce();
     const deadline = th.toDeadline(1000 * 60 * 60 * 60 * 24 * 28 );
@@ -2595,7 +2549,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // get ERC2612 permission from alice for stability pool to spend DLLR amount
     const permission = await signERC2612Permit(dennis_signer, nueMockToken.address, dennis_signer.address, troveManager.address, redemptionAmount.toString());
@@ -2694,7 +2648,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
@@ -2785,7 +2739,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
@@ -2876,7 +2830,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
@@ -2973,7 +2927,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Dennis redeems 20 ZUSD
     // Don't pay for gas, as it makes it easier to calculate the received Ether
@@ -3048,7 +3002,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Flyn redeems collateral
     await contracts.zusdToken.approve(
@@ -3116,7 +3070,7 @@ contract('TroveManager', async accounts => {
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Flyn redeems collateral with only two iterations
     await contracts.zusdToken.approve(
@@ -3165,7 +3119,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // ZUSD redemption is 55000 US
     const ZUSDRedemption = dec(55000, 18);
@@ -3195,7 +3149,7 @@ contract('TroveManager', async accounts => {
     // Skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // ZUSD redemption is 49900 ZUSD
     const ZUSDRedemption = dec(49900, 18); // await zusdToken.balanceOf(B) //dec(59800, 18)
@@ -3238,7 +3192,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     const {
       firstRedemptionHint,
@@ -3357,7 +3311,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     await contracts.zusdToken.approve(
       troveManager.address,
@@ -3412,7 +3366,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     await contracts.zusdToken.approve(
       troveManager.address,
@@ -3470,7 +3424,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     await contracts.zusdToken.approve(
       troveManager.address,
@@ -3781,7 +3735,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Erin attempts to redeem 400 ZUSD
     const {
@@ -3863,7 +3817,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Erin tries to redeem 1000 ZUSD
     try {
@@ -4019,7 +3973,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     await contracts.zusdToken.approve(
       troveManager.address,
@@ -4187,7 +4141,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // Bob attempts to redeem his ill-gotten 101 ZUSD, from a system that has 100 ZUSD outstanding debt
     try {
@@ -4555,7 +4509,7 @@ contract('TroveManager', async accounts => {
     const C_balanceBefore = toBN(await web3.eth.getBalance(C));
 
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // whale redeems 360 ZUSD.  Expect this to fully redeem A, B, C, and partially redeem D.
     await th.redeemCollateral(whale, contracts, redemptionAmount);
@@ -4665,7 +4619,7 @@ contract('TroveManager', async accounts => {
     // skip bootstrapping phase
     await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
     // Drain the redemption buffer so this test will complete successufully
-    await drainRedemptionBufferWithWhale();
+    await emptyRedemptionBufferAsOwner();
 
     // whale redeems ZUSD.  Expect this to fully redeem A, B, C, and partially redeem 15 ZUSD from D.
     const redemptionTx = await th.redeemCollateralAndGetTxObject(whale, contracts, redemptionAmount, th._100pct, { gasPrice: 0 });
