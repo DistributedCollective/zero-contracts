@@ -158,6 +158,16 @@ const config: HardhatUserConfig = {
                         enabled: true,
                         runs: 100,
                     },
+                    // Emit per-contract storageLayout so the ColFee storage-layout
+                    // zero-diff regression (tests-colfee/StorageLayout.zerodiff.test.js)
+                    // can assert the surplus-claim fee hook adds NO state to the
+                    // upgradeable BorrowerOperations / CollSurplusPool proxies or
+                    // ActivePool. Additive solc output; does not affect bytecode.
+                    outputSelection: {
+                        "*": {
+                            "*": ["storageLayout"],
+                        },
+                    },
                 },
             },
             {
@@ -240,6 +250,13 @@ const config: HardhatUserConfig = {
             timeout: 100000,
             gasPrice: 66000000,
             blockGasLimit: 6800000,
+            // Source verification target for `hardhat etherscan-verify` (hardhat-deploy):
+            // Rootstock Blockscout, etherscan-compatible API. The task submits the
+            // standard-JSON input stored in the deployment record; Blockscout accepts
+            // any non-empty --api-key value.
+            verify: {
+                etherscan: { apiUrl: "https://rootstock-testnet.blockscout.com" },
+            },
             //timeout: 20000, // increase if needed; 20000 is the default value
             //allowUnlimitedContractSize, //EIP170 contrtact size restriction temporal testnet workaround
         },
@@ -275,6 +292,10 @@ const config: HardhatUserConfig = {
             gasPrice: 66000000,
             blockGasLimit: 6800000,
             gas: "auto",
+            // Source verification target for `hardhat etherscan-verify` (see testnet note).
+            verify: {
+                etherscan: { apiUrl: "https://rootstock.blockscout.com" },
+            },
             //timeout: 20000, // increase if needed; 20000 is the default value
         },
         rskForkedMainnet: {

@@ -16,6 +16,7 @@ import "./Dependencies/console.sol";
 import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
 import "./Interfaces/IPermit2.sol";
+import "./Interfaces/colfee/IExitFeeController.sol";
 
 contract BorrowerOperations is
     LiquityBase,
@@ -25,6 +26,37 @@ contract BorrowerOperations is
 {
     /** CONSTANT / IMMUTABLE VARIABLE ONLY */
     IPermit2 public immutable permit2;
+
+    // --- ColFee (exit-fee) hook ---
+    // No new regular storage: the controller pointer lives in an EIP-1967-style
+    // unstructured slot so `BorrowerOperations` storage-layout is unchanged.
+    bytes32 private constant EXIT_FEE_CONTROLLER_SLOT =
+        bytes32(uint256(keccak256("sovryn.exitFeeController")) - 1);
+    bytes32 private constant SURFACE_ZERO_WITHDRAW_COLL =
+        keccak256("COLFEE:SURFACE_ZERO_WITHDRAW_COLL");
+    bytes32 private constant SURFACE_ZERO_CLAIM_SURPLUS =
+        keccak256("COLFEE:SURFACE_ZERO_CLAIM_SURPLUS");
+
+    event ExitFeeControllerSet(address indexed previous, address indexed current);
+    event ExitFeeApplied(
+        bytes32 indexed surfaceId,
+        address indexed actor,
+        address indexed asset,
+        address subProduct,
+        address recipient,
+        uint256 grossAmount,
+        uint256 feeAmount,
+        uint256 netAmount,
+        address feeReceiver
+    );
+    event ExitFeeSkipped(
+        bytes32 indexed surfaceId,
+        address indexed actor,
+        address indexed asset,
+        uint256 grossAmount,
+        uint16 rateBps,
+        uint8 reason
+    );
 
     /* --- Variable container structs  ---
 
@@ -374,7 +406,16 @@ contract BorrowerOperations is
         ISignatureTransfer.PermitTransferFrom memory _permit,
         bytes calldata _signature
     ) external override {
-        _adjustNueTroveWithPermit2(0, 0, _dllrAmount, false, _upperHint, _lowerHint, _permit, _signature);
+        _adjustNueTroveWithPermit2(
+            0,
+            0,
+            _dllrAmount,
+            false,
+            _upperHint,
+            _lowerHint,
+            _permit,
+            _signature
+        );
     }
 
     function adjustTrove(
@@ -710,7 +751,10 @@ contract BorrowerOperations is
         _closeTrove();
     }
 
-    function closeNueTroveWithPermit2(ISignatureTransfer.PermitTransferFrom memory _permit, bytes calldata _signature) external override {
+    function closeNueTroveWithPermit2(
+        ISignatureTransfer.PermitTransferFrom memory _permit,
+        bytes calldata _signature
+    ) external override {
         require(address(massetManager) != address(0), "Masset address not set");
 
         uint256 debt = troveManager.getTroveDebt(msg.sender);
@@ -768,16 +812,83 @@ contract BorrowerOperations is
             ZUSD_GAS_COMPENSATION
         );
 
-        // Send the collateral back to the user
-        activePoolCached.sendETH(msg.sender, coll);
+        // Send the collateral back to the user (charging the ColFee exit fee)
+        _sendCollWithExitFee(activePoolCached, msg.sender, coll);
     }
 
     /**
-     * Claim remaining collateral from a redemption or from a liquidation with ICR > MCR in Recovery Mode
+     * Claim remaining collateral from a redemption or from a liquidation with ICR > MCR in Recovery Mode,
+     * charging the ColFee exit fee when the SURFACE_ZERO_CLAIM_SURPLUS policy is active.
+     * Fail-open like every ColFee hook: on any ColFee failure (controller missing/
+     * reverting, invalid quote, fee-leg transfer failure inside the pool) the claimant
+     * receives the full surplus — a ColFee failure can never brick a claim. The
+     * non-charging path is the untouched claimColl flow (plus the ExitFeeSkipped
+     * event, same convention as _sendCollWithExitFee).
      */
     function claimCollateral() external override {
-        // send ETH from CollSurplus Pool to owner
-        collSurplusPool.claimColl(msg.sender);
+        uint256 gross = collSurplusPool.getCollateral(msg.sender);
+        // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
+        IExitFeeController.ExitFeeQuote memory q = _safeQuote(
+            SURFACE_ZERO_CLAIM_SURPLUS,
+            address(0),
+            msg.sender,
+            gross
+        );
+
+        // Defensive: a quote that charges into address(0) would burn the fee (a
+        // value call to a no-code address succeeds). Demote to the non-charging
+        // path — DISABLED is the enum's "feeReceiver == address(0)" reason.
+        if (q.active && q.feeAmount > 0 && q.feeReceiver == address(0)) {
+            q.active = false;
+            q.netAmount = gross;
+            q.reason = uint8(IExitFeeController.SkipReason.DISABLED);
+        }
+
+        if (q.active && q.feeAmount > 0) {
+            // Two-leg split inside the pool (fee → feeReceiver, net → claimant);
+            // the pool's fee leg is fail-open and reports which event is truthful.
+            bool feePaid = collSurplusPool.claimCollWithFee(
+                msg.sender,
+                q.feeReceiver,
+                q.feeAmount
+            );
+            if (feePaid) {
+                emit ExitFeeApplied(
+                    SURFACE_ZERO_CLAIM_SURPLUS,
+                    msg.sender,
+                    address(0),
+                    address(0),
+                    msg.sender,
+                    gross,
+                    q.feeAmount,
+                    q.netAmount,
+                    q.feeReceiver
+                );
+            } else {
+                emit ExitFeeSkipped(
+                    SURFACE_ZERO_CLAIM_SURPLUS,
+                    msg.sender,
+                    address(0),
+                    gross,
+                    q.rateBps,
+                    uint8(IExitFeeController.SkipReason.VAULT_REVERT)
+                );
+            }
+        } else {
+            // !active (INACTIVE / DISABLED / INVALID_QUOTE / CONTROLLER_REVERT)
+            // OR active-but-zero-fee (dust / zero-rate / gross == 0 → reason NONE).
+            emit ExitFeeSkipped(
+                SURFACE_ZERO_CLAIM_SURPLUS,
+                msg.sender,
+                address(0),
+                gross,
+                q.rateBps,
+                q.reason
+            );
+            // send ETH from CollSurplus Pool to owner — untouched original path
+            // (gross == 0 falls through to claimColl's own revert, identical to today)
+            collSurplusPool.claimColl(msg.sender);
+        }
     }
 
     // --- Helper functions ---
@@ -804,11 +915,10 @@ contract BorrowerOperations is
         return usdValue;
     }
 
-    function _getCollChange(uint256 _collReceived, uint256 _requestedCollWithdrawal)
-        internal
-        pure
-        returns (uint256 collChange, bool isCollIncrease)
-    {
+    function _getCollChange(
+        uint256 _collReceived,
+        uint256 _requestedCollWithdrawal
+    ) internal pure returns (uint256 collChange, bool isCollIncrease) {
         if (_collReceived != 0) {
             collChange = _collReceived;
             isCollIncrease = true;
@@ -862,8 +972,198 @@ contract BorrowerOperations is
         if (_isCollIncrease) {
             _activePoolAddColl(_activePool, _collChange);
         } else {
-            _activePool.sendETH(_borrower, _collChange);
+            _sendCollWithExitFee(_activePool, _borrower, _collChange);
         }
+    }
+
+    // --- ColFee (exit-fee) helpers ---
+
+    /// @notice Address of the ColFee controller this instance consults. Held in
+    ///         an EIP-1967-style unstructured slot (no regular-storage footprint).
+    function exitFeeController() public view returns (address ctrl) {
+        bytes32 slot = EXIT_FEE_CONTROLLER_SLOT;
+        assembly {
+            ctrl := sload(slot)
+        }
+    }
+
+    /// @notice Set (or rotate) the ColFee controller this instance consults.
+    ///         Owner-only, one call, effective for every subsequent exit.
+    function setExitFeeController(address ctrl) external onlyOwner {
+        require(ctrl != address(0), "EFC:zero");
+        // A no-code controller would make the high-level quoteExitFee call
+        // revert with "function call to a non-contract account", which 0.6.11
+        // try/catch does NOT catch — bricking borrower exits. Reject it here
+        // (and fail open in _safeQuote if it later becomes code-less).
+        checkContract(ctrl);
+        address prev = exitFeeController();
+        bytes32 slot = EXIT_FEE_CONTROLLER_SLOT;
+        assembly {
+            sstore(slot, ctrl)
+        }
+        emit ExitFeeControllerSet(prev, ctrl);
+    }
+
+    /// @dev Fail-open quote wrapper. On a missing/reverting controller or a
+    ///      semantically invalid quote, returns a non-charging quote with
+    ///      `netAmount == gross`. The validity gate uses subtraction only
+    ///      (`feeAmount > gross`), never an unchecked addition, and recomputes
+    ///      `netAmount = gross - feeAmount` so the fee + user legs always sum to
+    ///      exactly `gross` — protecting ActivePool liquidity from a bad or
+    ///      upgraded controller.
+    function _safeQuote(
+        bytes32 surfaceId,
+        address subProduct,
+        address actor,
+        uint256 gross
+    ) private view returns (IExitFeeController.ExitFeeQuote memory q) {
+        address ctrl = exitFeeController();
+        // Fail open on a missing OR code-less controller. The address(0) check
+        // alone is not enough: a high-level call to any no-code address (EOA,
+        // or a controller that self-destructed after being set) reverts with
+        // "function call to a non-contract account", which 0.6.11 try/catch
+        // does NOT catch — so guard on extcodesize before the call.
+        uint256 ctrlSize;
+        assembly {
+            ctrlSize := extcodesize(ctrl)
+        }
+        if (ctrl == address(0) || ctrlSize == 0) {
+            q.netAmount = gross;
+            q.reason = uint8(IExitFeeController.SkipReason.CONTROLLER_REVERT);
+            return q;
+        }
+        try IExitFeeController(ctrl).quoteExitFee(surfaceId, subProduct, actor, gross) returns (
+            IExitFeeController.ExitFeeQuote memory got
+        ) {
+            // Pool conservation is the consumer's own concern: it holds exactly `gross`
+            // wei to distribute, so it must never be asked to pay out more. A
+            // feeAmount > gross would underflow the net recompute below (bricking the
+            // exit) and a fee leg > gross could draw OTHER troves' collateral out of
+            // ActivePool. Rate, receiver, and fee policy are the configured
+            // controller's responsibility — not re-validated here.
+            if (got.feeAmount > gross) {
+                // Override only the verdict; leave the controller's raw feeAmount /
+                // rateBps / feeReceiver intact (active=false gates charging downstream).
+                got.active = false;
+                got.netAmount = gross; // non-charging shape: net == gross
+                got.reason = uint8(IExitFeeController.SkipReason.INVALID_QUOTE);
+                return got;
+            }
+            got.netAmount = gross - got.feeAmount; // fee + net == gross (no residue)
+            return got;
+        } catch {
+            q.netAmount = gross;
+            q.reason = uint8(IExitFeeController.SkipReason.CONTROLLER_REVERT);
+        }
+    }
+
+    /// @dev Settle a borrower collateral payout, charging the ColFee exit fee
+    ///      when the resolved policy is active. The fee leg uses `try/catch`
+    ///      (0.6.11 native) so a fee-receiver failure never bricks the exit; on
+    ///      any non-charging path the full `gross` is sent to the borrower via
+    ///      the existing fail-closed `sendETH`. ActivePool's recorded ETH
+    ///      decrements by exactly `gross` either way (the reverted fee-leg
+    ///      subcall rolls back its `ETH.sub`).
+    function _sendCollWithExitFee(
+        IActivePool _activePool,
+        address borrower,
+        uint256 gross
+    ) private {
+        // Debt-only adjustments (repay / debt-decrease) reach here with gross == 0:
+        // no collateral leaves the pool, so there is nothing to settle. Skip the
+        // controller round-trip and the ColFee event. (Baseline called
+        // sendETH(borrower, 0) here — a value-less no-op that only emitted
+        // EtherSent(_, 0) / ActivePoolETHBalanceUpdated; we drop that redundant
+        // transfer, so debt-only ops emit fewer events than pre-ColFee.)
+        if (gross == 0) {
+            return;
+        }
+
+        // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
+        IExitFeeController.ExitFeeQuote memory q = _safeQuote(
+            SURFACE_ZERO_WITHDRAW_COLL,
+            address(0),
+            borrower,
+            gross
+        );
+
+        if (q.active && q.feeAmount > 0) {
+            try _activePool.sendETH(q.feeReceiver, q.feeAmount) {
+                _activePool.sendETH(borrower, q.netAmount); // user leg: existing fail-closed behavior
+                // Emit only after BOTH legs settle, so an ExitFeeApplied event always
+                // implies a completed borrower payout (truthful by construction).
+                emit ExitFeeApplied(
+                    SURFACE_ZERO_WITHDRAW_COLL,
+                    borrower,
+                    address(0),
+                    address(0),
+                    borrower,
+                    gross,
+                    q.feeAmount,
+                    q.netAmount,
+                    q.feeReceiver
+                );
+                return;
+            } catch {
+                emit ExitFeeSkipped(
+                    SURFACE_ZERO_WITHDRAW_COLL,
+                    borrower,
+                    address(0),
+                    gross,
+                    q.rateBps,
+                    uint8(IExitFeeController.SkipReason.VAULT_REVERT)
+                );
+            }
+        } else {
+            // !active (INACTIVE / DISABLED / INVALID_QUOTE / CONTROLLER_REVERT)
+            // OR active-but-zero-fee (dust / zero-rate policy → q.reason == NONE).
+            emit ExitFeeSkipped(
+                SURFACE_ZERO_WITHDRAW_COLL,
+                borrower,
+                address(0),
+                gross,
+                q.rateBps,
+                q.reason
+            );
+        }
+        _activePool.sendETH(borrower, gross); // full-gross fallback (any non-charging path)
+    }
+
+    /// @notice Read-only preview of the ColFee exit fee on a Zero borrower collateral
+    ///         payout of `grossColl` for `borrower`. Hard-wired to
+    ///         SURFACE_ZERO_WITHDRAW_COLL / subProduct=address(0) / actor=borrower, and
+    ///         routes through the same `_safeQuote` the live hook uses — so the synthesized
+    ///         fail-open quote on controller failure matches execution wei-for-wise. The
+    ///         caller passes `grossColl` (computed from trove state); this is a thin policy
+    ///         lookup, not a re-derivation of the per-function gross.
+    /// @return rateBps     resolved rate (0 when not charging / fail-open)
+    /// @return feeAmount   fee that would be taken (0 unless active && rateBps>0 && not dust)
+    /// @return netAmount   amount the borrower would receive (== grossColl when not charging)
+    /// @return feeReceiver fee destination from the quote
+    /// @return active      resolved policy active flag (the "will charge" test is active && feeAmount>0)
+    /// @return reason      SkipReason (NONE on an honest/charging quote)
+    function previewZeroCollWithdrawExitFee(
+        address borrower,
+        uint256 grossColl
+    )
+        external
+        view
+        returns (
+            uint16 rateBps,
+            uint256 feeAmount,
+            uint256 netAmount,
+            address feeReceiver,
+            bool active,
+            uint8 reason
+        )
+    {
+        IExitFeeController.ExitFeeQuote memory q = _safeQuote(
+            SURFACE_ZERO_WITHDRAW_COLL,
+            address(0),
+            borrower,
+            grossColl
+        );
+        return (q.rateBps, q.feeAmount, q.netAmount, q.feeReceiver, q.active, q.reason);
     }
 
     /// Send ETH to Active Pool and increase its recorded ETH balance
@@ -911,10 +1211,10 @@ contract BorrowerOperations is
         );
     }
 
-    function _requireNonZeroAdjustment(uint256 _collWithdrawal, uint256 _ZUSDChange)
-        internal
-        view
-    {
+    function _requireNonZeroAdjustment(
+        uint256 _collWithdrawal,
+        uint256 _ZUSDChange
+    ) internal view {
         require(
             msg.value != 0 || _collWithdrawal != 0 || _ZUSDChange != 0,
             "BorrowerOps: There must be either a collateral change or a debt change"
@@ -926,10 +1226,10 @@ contract BorrowerOperations is
         require(status == 1, "BorrowerOps: Trove does not exist or is closed");
     }
 
-    function _requireTroveisNotActive(ITroveManager _troveManager, address _borrower)
-        internal
-        view
-    {
+    function _requireTroveisNotActive(
+        ITroveManager _troveManager,
+        address _borrower
+    ) internal view {
         uint256 status = _troveManager.getTroveStatus(_borrower);
         require(status != 1, "BorrowerOps: Trove is active");
     }
@@ -1026,10 +1326,10 @@ contract BorrowerOperations is
         );
     }
 
-    function _requireValidZUSDRepayment(uint256 _currentDebt, uint256 _debtRepayment)
-        internal
-        pure
-    {
+    function _requireValidZUSDRepayment(
+        uint256 _currentDebt,
+        uint256 _debtRepayment
+    ) internal pure {
         require(
             _debtRepayment <= _currentDebt.sub(ZUSD_GAS_COMPENSATION),
             "BorrowerOps: Amount repaid must not be larger than the Trove's debt"
@@ -1051,10 +1351,10 @@ contract BorrowerOperations is
         );
     }
 
-    function _requireValidMaxFeePercentage(uint256 _maxFeePercentage, bool _isRecoveryMode)
-        internal
-        view
-    {
+    function _requireValidMaxFeePercentage(
+        uint256 _maxFeePercentage,
+        bool _isRecoveryMode
+    ) internal view {
         if (_isRecoveryMode) {
             require(
                 _maxFeePercentage <= DECIMAL_PRECISION,

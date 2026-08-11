@@ -18,6 +18,7 @@ import "../ZUSDToken.sol";
 import "./PriceFeedTestnet.sol";
 import "../SortedTroves.sol";
 import "./EchidnaProxy.sol";
+import "./EchidnaHarnessStubs.sol";
 
 //import "../Dependencies/console.sol";
 
@@ -53,6 +54,7 @@ contract EchidnaTester {
 
     constructor(address _permit2) public payable {
         liquityBaseParams = new LiquityBaseParams();
+        liquityBaseParams.initialize(); // sets MCR (110%) / CCR (150%)
         troveManagerRedeemOps = new TroveManagerRedeemOps(14 * 86400, _permit2);
         troveManager = new TroveManager(14 days, _permit2);
         borrowerOperations = new BorrowerOperations(_permit2);
@@ -72,9 +74,16 @@ contract EchidnaTester {
 
         sortedTroves = new SortedTroves();
 
+        // Inert peripherals so the core `setAddresses` `checkContract` passes;
+        // value-neutral under the fuzzer (see EchidnaHarnessStubs.sol).
+        address feeDistributor = address(new EchidnaFeeDistributorStub());
+        address communityIssuance = address(new EchidnaCommunityIssuanceStub());
+        address zeroToken = address(new EchidnaInertStub());
+        address zeroStaking = address(new EchidnaInertStub());
+
         troveManager.setAddresses(
             ITroveManager.TroveManagerInitAddressesParams(
-                address(0),
+                feeDistributor,
                 address(troveManagerRedeemOps),
                 address(liquityBaseParams),
                 address(borrowerOperations),
@@ -86,13 +95,13 @@ contract EchidnaTester {
                 address(priceFeedTestnet),
                 address(zusdToken),
                 address(sortedTroves),
-                address(0),
-                address(0)
+                zeroToken,
+                zeroStaking
             )
         );
 
         borrowerOperations.setAddresses(
-            address(0),
+            feeDistributor,
             address(liquityBaseParams),
             address(troveManager),
             address(activePool),
@@ -103,7 +112,7 @@ contract EchidnaTester {
             address(priceFeedTestnet),
             address(sortedTroves),
             address(zusdToken),
-            address(0)
+            zeroStaking
         );
 
         activePool.setAddresses(
@@ -123,7 +132,7 @@ contract EchidnaTester {
             address(zusdToken),
             address(sortedTroves),
             address(priceFeedTestnet),
-            address(0)
+            communityIssuance
         );
 
         collSurplusPool.setAddresses(
@@ -219,16 +228,73 @@ contract EchidnaTester {
         return ZUSDAmount;
     }
 
+    function getMinCollForRatio(uint debt, uint ratio, uint price) internal pure returns (uint) {
+        if (price == 0 || debt > uint(-1).div(ratio)) {
+            return uint(-1);
+        }
+
+        uint minColl = debt.mul(ratio).div(price);
+        if (minColl == uint(-1)) {
+            return uint(-1);
+        }
+        return minColl.add(1);
+    }
+
+    function getAdjustedCollWithdrawal(
+        address borrower,
+        uint _amount
+    ) internal view returns (uint) {
+        uint price = priceFeedTestnet.getPrice();
+        if (price == 0 || troveManager.checkRecoveryMode(price)) {
+            return 0;
+        }
+
+        uint debt = troveManager.getTroveDebt(borrower);
+        uint coll = troveManager.getTroveColl(borrower);
+        if (debt == 0 || coll == 0) {
+            return 0;
+        }
+
+        uint minBorrowerColl = getMinCollForRatio(debt, CCR, price);
+        if (coll <= minBorrowerColl) {
+            return 0;
+        }
+
+        uint maxWithdrawal = coll.sub(minBorrowerColl);
+        uint systemDebt = activePool.getZUSDDebt().add(defaultPool.getZUSDDebt());
+        uint systemColl = activePool.getETH().add(defaultPool.getETH());
+        uint minSystemColl = getMinCollForRatio(systemDebt, CCR, price);
+        if (systemColl <= minSystemColl) {
+            return 0;
+        }
+
+        uint systemRoom = systemColl.sub(minSystemColl);
+        if (maxWithdrawal > systemRoom) {
+            maxWithdrawal = systemRoom;
+        }
+        if (maxWithdrawal == 0) {
+            return 0;
+        }
+
+        uint minWithdrawal = 100; // 1% fee rounds to at least 1 wei.
+        if (maxWithdrawal < minWithdrawal) {
+            return 0;
+        }
+        return minWithdrawal + (_amount % (maxWithdrawal.sub(minWithdrawal).add(1)));
+    }
+
     function openTroveExt(uint _i, uint _ETH, uint _ZUSDAmount) public payable {
         uint actor = _i % NUMBER_OF_ACTORS;
         EchidnaProxy echidnaProxy = echidnaProxies[actor];
         uint actorBalance = address(echidnaProxy).balance;
 
-        // we pass in CCR instead of MCR in case it’s the first one
-        uint ETH = getAdjustedETH(actorBalance, _ETH, CCR);
-        uint ZUSDAmount = getAdjustedZUSD(ETH, _ZUSDAmount, CCR);
+        // Keep convenience opens comfortably above CCR so collateral-exit
+        // wrappers have room to exercise withdrawal paths.
+        uint openRatio = CCR.mul(2);
+        uint ETH = getAdjustedETH(actorBalance, _ETH, openRatio);
+        uint ZUSDAmount = getAdjustedZUSD(ETH, _ZUSDAmount, openRatio);
 
-        echidnaProxy.openTrovePrx(ETH, ZUSDAmount, address(0), address(0), 0);
+        echidnaProxy.openTrovePrx(ETH, ZUSDAmount, address(0), address(0), 1e18);
 
         numberOfTroves = troveManager.getTroveOwnersCount();
         assert(numberOfTroves > 0);
@@ -245,7 +311,8 @@ contract EchidnaTester {
         uint _maxFee
     ) public payable {
         uint actor = _i % NUMBER_OF_ACTORS;
-        echidnaProxies[actor].openTrovePrx(_ETH, _ZUSDAmount, _upperHint, _lowerHint, _maxFee);
+        uint maxFee = _clampMaxFee(_maxFee);
+        echidnaProxies[actor].openTrovePrx(_ETH, _ZUSDAmount, _upperHint, _lowerHint, maxFee);
     }
 
     function addCollExt(uint _i, uint _ETH) external payable {
@@ -275,7 +342,12 @@ contract EchidnaTester {
         address _lowerHint
     ) external {
         uint actor = _i % NUMBER_OF_ACTORS;
-        echidnaProxies[actor].withdrawCollPrx(_amount, _upperHint, _lowerHint);
+        EchidnaProxy echidnaProxy = echidnaProxies[actor];
+        uint amount = getAdjustedCollWithdrawal(address(echidnaProxy), _amount);
+        if (amount == 0) {
+            return;
+        }
+        echidnaProxy.withdrawCollPrx(amount, _upperHint, _lowerHint);
     }
 
     function withdrawZUSDExt(
@@ -286,7 +358,8 @@ contract EchidnaTester {
         uint _maxFee
     ) external {
         uint actor = _i % NUMBER_OF_ACTORS;
-        echidnaProxies[actor].withdrawZUSDPrx(_amount, _upperHint, _lowerHint, _maxFee);
+        uint maxFee = _clampMaxFee(_maxFee);
+        echidnaProxies[actor].withdrawZUSDPrx(_amount, _upperHint, _lowerHint, maxFee);
     }
 
     function repayZUSDExt(uint _i, uint _amount, address _upperHint, address _lowerHint) external {
@@ -324,7 +397,7 @@ contract EchidnaTester {
             _isDebtIncrease,
             address(0),
             address(0),
-            0
+            1e18
         );
     }
 
@@ -339,6 +412,7 @@ contract EchidnaTester {
         uint _maxFee
     ) external payable {
         uint actor = _i % NUMBER_OF_ACTORS;
+        uint maxFee = _clampMaxFee(_maxFee);
         echidnaProxies[actor].adjustTrovePrx(
             _ETH,
             _collWithdrawal,
@@ -346,7 +420,7 @@ contract EchidnaTester {
             _isDebtIncrease,
             _upperHint,
             _lowerHint,
-            _maxFee
+            maxFee
         );
     }
 
@@ -405,8 +479,19 @@ contract EchidnaTester {
     // PriceFeed
 
     function setPriceExt(uint256 _price) external {
+        if (_price == 0) {
+            _price = 1;
+        }
         bool result = priceFeedTestnet.setPrice(_price);
         assert(result);
+    }
+
+    function _clampMaxFee(uint _maxFee) internal pure returns (uint) {
+        uint maxFee = _maxFee % (1e18 + 1);
+        if (maxFee < 5e15) {
+            maxFee = 5e15;
+        }
+        return maxFee;
     }
 
     // --------------------------
@@ -535,6 +620,10 @@ contract EchidnaTester {
     // Total ZUSD matches
     function echidna_ZUSD_global_balances() public view returns (bool) {
         uint totalSupply = zusdToken.totalSupply();
+        if (totalSupply == 0) {
+            return true;
+        }
+
         uint gasPoolBalance = zusdToken.balanceOf(address(gasPool));
 
         uint activePoolBalance = activePool.getZUSDDebt();

@@ -385,7 +385,7 @@ const deployWithCustomProxy = async (
         const proxyDeployment = await get(proxyDeployedName);
         await deploymentsSave(logicName, {
             abi: tx.abi,
-            address: proxy.address, // used to override receipt.contractAddress (useful for proxies)
+            address: proxyDeployment.address, // used to override receipt.contractAddress (useful for proxies); the ethers v6 Contract has no .address, which would silently fall back to the implementation address here
             receipt: tx.receipt,
             bytecode: tx.bytecode,
             deployedBytecode: tx.deployedBytecode,
