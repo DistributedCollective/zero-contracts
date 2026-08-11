@@ -1,6 +1,7 @@
 {
   "name": "@sovryn-zero/contracts",
   "version": "0.4.0",
+  "packageManager": "yarn@1.22.22",
   "description": "Sovryn Zero solidity contracts",
   "main": "index.js",
   "directories": {
@@ -31,6 +32,8 @@
     "dist-pack": "cd ./dist && yarn pack --filename ../sovryn-zero-contracts-package.tgz",
     "prepack:docgen": "yarn docgen",
     "prepare-artifacts": "node scripts/prepare-artifacts.js",
+    "report:period-totals": "node scripts/run-period-totals.js",
+    "report:period-totals-monthly": "node scripts/report-period-totals-monthly.js",
     "prepack:prepare-dist": "echo 'commented out: yarn prepare-dist'",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
