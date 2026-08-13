@@ -70,7 +70,10 @@ const testnetPKs = [
 
 const testnetAccounts = testnetPKs.length > 0 ? testnetPKs : mnemonic;
 const mainnetAccounts = process.env.MAINNET_DEPLOYER_PRIVATE_KEY
-    ? [process.env.MAINNET_DEPLOYER_PRIVATE_KEY]
+    ? [
+          process.env.MAINNET_DEPLOYER_PRIVATE_KEY,
+          ...(process.env.DEPLOYER ? [process.env.DEPLOYER] : []),
+      ]
     : mnemonic;
 
 task(
@@ -190,6 +193,7 @@ const config: HardhatUserConfig = {
     namedAccounts: {
         deployer: {
             default: 0,
+            rskSovrynMainnet: 1,
         },
         signer: {
             default: 1,
