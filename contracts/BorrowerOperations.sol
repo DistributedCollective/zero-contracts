@@ -17,6 +17,7 @@ import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
 import "./Interfaces/IPermit2.sol";
 import "./Interfaces/colfee/IExitFeeController.sol";
+import "./Interfaces/colfee/IExitDelayQueueHook.sol";
 
 contract BorrowerOperations is
     LiquityBase,
@@ -37,7 +38,17 @@ contract BorrowerOperations is
     bytes32 private constant SURFACE_ZERO_CLAIM_SURPLUS =
         keccak256("COLFEE:SURFACE_ZERO_CLAIM_SURPLUS");
 
+    // --- Security-perimeter exit-delay hook ---
+    // The delay queue pointer also lives in an EIP-1967-style unstructured
+    // slot, so `BorrowerOperations` storage-layout is unchanged (zero-diff). It is
+    // rotated with `setExitDelayQueue` under the SAME owner as the controller
+    // pointer. Because the pointer redirects ESCROW it is more sensitive than the
+    // controller pointer — rotation is an Owner/SIP action.
+    bytes32 private constant EXIT_DELAY_QUEUE_SLOT =
+        bytes32(uint256(keccak256("sovryn.exitDelayQueue")) - 1);
+
     event ExitFeeControllerSet(address indexed previous, address indexed current);
+    event ExitDelayQueueSet(address indexed previous, address indexed current);
     event ExitFeeApplied(
         bytes32 indexed surfaceId,
         address indexed actor,
@@ -1004,6 +1015,86 @@ contract BorrowerOperations is
         emit ExitFeeControllerSet(prev, ctrl);
     }
 
+    /// @notice Address of the ExitDelayQueue this instance escrows delayed
+    ///         collateral exits into. Held in an EIP-1967-style unstructured slot
+    ///         (no regular-storage footprint). address(0) until governance pins
+    ///         one ⇒ the security-perimeter reroute is unwired ⇒ exits pay direct
+    ///         at `d == 0` and fail CLOSED at `d > 0` (a delay is never silently
+    ///         bypassed by a missing pointer).
+    function exitDelayQueue() public view returns (address queue) {
+        bytes32 slot = EXIT_DELAY_QUEUE_SLOT;
+        assembly {
+            queue := sload(slot)
+        }
+    }
+
+    /// @notice Pin/rotate the ExitDelayQueue pointer. `onlyOwner` — the same
+    ///         BorrowerOperations proxy owner (= TimelockOwner on mainnet) that
+    ///         gates `setExitFeeController`. Because the pointer redirects ESCROW
+    ///         it is MORE sensitive than the controller pointer; rotation is an
+    ///         Owner/SIP action. Reverts on a non-contract so a typo cannot point
+    ///         the reroute at a no-code address (address(0) is likewise rejected —
+    ///         unwiring, if ever needed, is a deliberate distinct governance path,
+    ///         and the perimeter is instead disabled via the controller kill
+    ///         switch, which quotes `d == 0` and pays direct).
+    function setExitDelayQueue(address queue) external onlyOwner {
+        require(queue != address(0), "EDQ:zero");
+        checkContract(queue);
+        address prev = exitDelayQueue();
+        bytes32 slot = EXIT_DELAY_QUEUE_SLOT;
+        assembly {
+            sstore(slot, queue)
+        }
+        emit ExitDelayQueueSet(prev, queue);
+    }
+
+    /// @dev Fail-CLOSED delay quote wrapper. Resolves the single hook
+    ///      entry `quoteExitDelayFor` on the shared ColFee controller and returns
+    ///      `(d, effOrig, effOwner)`. Two levels, deliberately distinct:
+    ///        1. controller-POINTER lookup is FAIL-OPEN — a missing OR code-less
+    ///           controller ⇒ perimeter unwired ⇒ `(0, raw, raw)` ⇒ pay direct
+    ///           (mirrors the fee path; also, 0.6.11 try/catch does NOT catch a
+    ///           call to a no-code address, so the extcodesize guard is required);
+    ///        2. once a controller is resolved, the `quoteExitDelayFor` CALL is
+    ///           FAIL-CLOSED — a revert reverts the whole exit and MUST NOT be
+    ///           interpreted as `d = 0`-direct (that would silently disable the
+    ///           perimeter — the hazard this guards against). Uses a DISTINCT revert selector for
+    ///           halt monitoring.
+    ///      The `!securityPerimeterEnabled` short-circuit is the FIRST statement
+    ///      inside `quoteExitDelayFor`, so a healthy-but-disabled perimeter returns
+    ///      `(0, raw, owner)` normally (liveness escape). The hook ignores
+    ///      `effOrig`/`effOwner` whenever `d == 0`.
+    function _safeQuoteExitDelay(
+        address rawOriginator,
+        address owner,
+        address receiver
+    ) private view returns (uint32 d, address effOrig, address effOwner) {
+        address ctrl = exitFeeController();
+        uint256 ctrlSize;
+        assembly {
+            ctrlSize := extcodesize(ctrl)
+        }
+        // Level 1 — FAIL-OPEN pointer lookup: unwired/unreachable ⇒ direct pay.
+        // Raw identities are returned but the caller ignores them when d == 0.
+        if (ctrl == address(0) || ctrlSize == 0) {
+            return (0, rawOriginator, owner);
+        }
+        // Level 2 — FAIL-CLOSED quote: a controller revert reverts the exit.
+        try
+            IExitFeeController(ctrl).quoteExitDelayFor(
+                rawOriginator,
+                owner,
+                receiver,
+                SURFACE_ZERO_WITHDRAW_COLL,
+                address(0)
+            )
+        returns (uint32 d_, address effOrig_, address effOwner_) {
+            return (d_, effOrig_, effOwner_);
+        } catch {
+            revert("COLFEE:delay-quote-failed");
+        }
+    }
+
     /// @dev Fail-open quote wrapper. On a missing/reverting controller or a
     ///      semantically invalid quote, returns a non-charging quote with
     ///      `netAmount == gross`. The validity gate uses subtraction only
@@ -1079,6 +1170,17 @@ contract BorrowerOperations is
             return;
         }
 
+        // Security-perimeter delay quote — computed ONCE up-front so a single `d`
+        // governs the WHOLE exit: a fee-vault failure still escrows GROSS
+        // behind the delay and cannot bypass it. FAIL-CLOSED (except the
+        // kill-switch / unwired short-circuit): a controller revert reverts the
+        // exit. Zero has no passthrough, so originator == owner == receiver
+        // == borrower (== msg.sender on every collateral-out path). The queue is
+        // NEVER touched here — only inside the `d > 0` branch of `_payUserColl`
+        //.
+        DelayLeg memory dl;
+        (dl.d, dl.effOrig, dl.effOwner) = _safeQuoteExitDelay(borrower, borrower, borrower);
+
         // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
         IExitFeeController.ExitFeeQuote memory q = _safeQuote(
             SURFACE_ZERO_WITHDRAW_COLL,
@@ -1089,7 +1191,8 @@ contract BorrowerOperations is
 
         if (q.active && q.feeAmount > 0) {
             try _activePool.sendETH(q.feeReceiver, q.feeAmount) {
-                _activePool.sendETH(borrower, q.netAmount); // user leg: existing fail-closed behavior
+                // user leg (net): direct-pay OR reroute to the delay queue when d>0
+                _payUserColl(_activePool, borrower, q.netAmount, dl);
                 // Emit only after BOTH legs settle, so an ExitFeeApplied event always
                 // implies a completed borrower payout (truthful by construction).
                 emit ExitFeeApplied(
@@ -1126,7 +1229,71 @@ contract BorrowerOperations is
                 q.reason
             );
         }
-        _activePool.sendETH(borrower, gross); // full-gross fallback (any non-charging path)
+        // full-gross fallback (any non-charging path): direct-pay OR reroute to the
+        // delay queue when d>0 — the same up-front `d` governs both legs.
+        _payUserColl(_activePool, borrower, gross, dl);
+    }
+
+    /// @dev Bundles the resolved delay-leg fields so `_payUserColl` stays a
+    ///      single-slot call and `_sendCollWithExitFee` does not run into the
+    ///      0.6.11 stack-depth limit. `d == 0` ⇒ perimeter off / bypassed /
+    ///      unwired ⇒ pay direct. Zero surface has no passthrough, so
+    ///      `effOrig`/`effOwner` are the raw identities.
+    struct DelayLeg {
+        uint32 d;
+        address effOrig;
+        address effOwner;
+    }
+
+    /// @dev Settle the (post-fee) borrower USER leg of a voluntary collateral-out.
+    ///      When the perimeter quotes no delay (`d == 0`) this is the EXISTING
+    ///      native payout, byte-for-byte unchanged (`sendETH(receiver, amount)`).
+    ///      When `d > 0` the leg is rerouted into the ExitDelayQueue: ActivePool
+    ///      PUSHES the native RBTC to the queue, immediately followed by
+    ///      `recordReceivedNativeExit` in the SAME outer tx — both INSIDE this
+    ///      `d > 0` branch so the queue is never touched until a delay is
+    ///      established off-queue, and a record revert rolls back the push
+    ///      (fail-CLOSED: after the trove state already mutated, the whole
+    ///      close/adjust reverts atomically — a bricked queue blocks Zero closes
+    ///      until the kill switch is flipped). The queue's `receive()` is
+    ///      unconditional and, via measured-receipt, credits EXACTLY `amount` when
+    ///      its surplus `>= amount` — a donation cannot brick the record.
+    function _payUserColl(
+        IActivePool _activePool,
+        address receiver,
+        uint256 amount,
+        DelayLeg memory dl
+    ) private {
+        // A net leg can be 0 on a full-fee edge; nothing to pay or escrow.
+        if (amount == 0) {
+            return;
+        }
+
+        if (dl.d > 0) {
+            address queue = exitDelayQueue();
+            // FAIL-CLOSED: once the perimeter quotes d>0 the user leg MUST escrow.
+            // An unwired queue reverts the exit with a DISTINCT selector (halt
+            // monitoring) — a delay can never be silently bypassed by a missing
+            // pointer.
+            require(queue != address(0), "COLFEE:queue-unset");
+            require(amount <= uint256(uint128(-1)), "COLFEE:amount-too-large");
+
+            // PUSH native to the queue (reuses the existing fail-closed sendETH
+            // primitive — ActivePool.ETH decrements by exactly `amount`, identical
+            // to the direct payout), then measured-record in the SAME outer tx.
+            _activePool.sendETH(queue, amount);
+            IExitDelayQueueHook(queue).recordReceivedNativeExit(
+                uint128(amount),
+                dl.d,
+                SURFACE_ZERO_WITHDRAW_COLL,
+                address(0),
+                dl.effOrig,
+                dl.effOwner,
+                receiver
+            );
+        } else {
+            _activePool.sendETH(receiver, amount); // EXISTING native payout, unchanged
+        }
     }
 
     /// @notice Read-only preview of the ColFee exit fee on a Zero borrower collateral

@@ -1,28 +1,31 @@
 // ColFee security perimeter — storage-layout ZERO-DIFF regression.
 //
-// The Zero surplus-claim exit-fee hook adds NO storage to any deployed
-// upgradeable contract: the surface id is a constant, the exit-fee controller
-// pointer lives in an EIP-1967-style unstructured slot, and the hook declares
-// no new state variables on the BorrowerOperations or CollSurplusPool proxies.
-// That is true BY CONSTRUCTION today — but nothing GUARDS a future edit from
-// appending a `uint256` to the proxy and silently corrupting every live
-// trove's storage on the next upgrade.
+// Neither the Zero surplus-claim exit-fee hook NOR the borrower exit-DELAY
+// reroute adds storage to any deployed upgradeable contract: the surface ids
+// are constants, the exit-fee controller pointer and the ExitDelayQueue
+// pointer (keccak256("sovryn.exitDelayQueue") - 1) live in EIP-1967-style
+// unstructured slots, and the hooks declare no new state variables on the
+// BorrowerOperations or CollSurplusPool proxies. That is true BY CONSTRUCTION
+// today — but nothing GUARDS a future edit from appending a `uint256` to the
+// proxy and silently corrupting every live trove's storage on the next
+// upgrade.
 //
 // This test is that guard. It compares the current, normalized solc
 // `storageLayout` of BorrowerOperations, CollSurplusPool, and ActivePool
 // against a committed baseline and FAILS on any label/slot/offset/type
-// difference. The ColFee lending side carries an equivalent Hardhat guard over
-// its own upgradeable contracts.
+// difference. The lending side carries an equivalent guard over its own
+// upgradeable contracts.
 //
 // SCOPE OF THE BASELINE (be precise about what this proves): the committed
 // baseline was captured at `sovryn-perimeter-fee @ b6584a6`, a tree that ALREADY
 // contains the borrower-exit hook (`_sendCollWithExitFee`, the unstructured
 // controller slot, the surface-id constants). So this guard proves the
-// SURPLUS-CLAIM hook appended no state, and forbids any future append to all
-// three contracts. It does NOT independently re-prove the borrower-exit hook's
-// zero-diff — that holds by construction (constants + an EIP-1967-style slot,
-// neither of which occupies a regular-storage slot) and is reviewable in the
-// contract source, but it is not what this baseline compares against.
+// SURPLUS-CLAIM hook and the EXIT-DELAY hooks appended no state, and forbids
+// any future append to all three contracts. It does NOT independently re-prove
+// the borrower-exit hook's zero-diff — that holds by construction (constants
+// plus EIP-1967-style slots for the controller and queue pointers, none of
+// which occupies a regular-storage slot) and is reviewable in the contract
+// source, but it is not what this baseline compares against.
 //
 // Requires `storageLayout` in the 0.6.11 compiler outputSelection
 // (hardhat.config.ts) — the shared helper throws (never silently passes) if the
@@ -49,7 +52,7 @@ const TARGETS = [
     "contracts/CollSurplusPool.sol:CollSurplusPool", // gains claimCollWithFee — functions only, no state
 ];
 
-describe("ColFee — storage-layout zero-diff (Zero surplus-claim exit fee)", () => {
+describe("ColFee — storage-layout zero-diff (surplus-claim fee hook + exit-delay reroute)", () => {
     let baseline;
 
     before(() => {
