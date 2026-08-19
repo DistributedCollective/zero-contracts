@@ -3,7 +3,7 @@
 // Neither the Zero surplus-claim exit-fee hook NOR the borrower exit-DELAY
 // reroute adds storage to any deployed upgradeable contract: the surface ids
 // are constants, the exit-fee controller pointer and the ExitDelayQueue
-// pointer (keccak256("sovryn.exitDelayQueue") - 1) live in EIP-1967-style
+// pointer (keccak256("sovryn.perimeterExitDelayQueue") - 1) live in EIP-1967-style
 // unstructured slots, and the hooks declare no new state variables on the
 // BorrowerOperations or CollSurplusPool proxies. That is true BY CONSTRUCTION
 // today — but nothing GUARDS a future edit from appending a `uint256` to the

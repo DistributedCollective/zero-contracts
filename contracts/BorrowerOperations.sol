@@ -32,7 +32,7 @@ contract BorrowerOperations is
     // No new regular storage: the controller pointer lives in an EIP-1967-style
     // unstructured slot so `BorrowerOperations` storage-layout is unchanged.
     bytes32 private constant EXIT_FEE_CONTROLLER_SLOT =
-        bytes32(uint256(keccak256("sovryn.exitFeeController")) - 1);
+        bytes32(uint256(keccak256("sovryn.perimeterExitFeeController")) - 1);
     bytes32 private constant PERIMETER_SURFACE_ZERO_WITHDRAW_COLL =
         keccak256("PERIMETER_SURFACE_ZERO_WITHDRAW_COLL");
     bytes32 private constant PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS =
@@ -45,7 +45,7 @@ contract BorrowerOperations is
     // pointer. Because the pointer redirects ESCROW it is more sensitive than the
     // controller pointer — rotation is an Owner/SIP action.
     bytes32 private constant EXIT_DELAY_QUEUE_SLOT =
-        bytes32(uint256(keccak256("sovryn.exitDelayQueue")) - 1);
+        bytes32(uint256(keccak256("sovryn.perimeterExitDelayQueue")) - 1);
 
     event ExitFeeControllerSet(address indexed previous, address indexed current);
     event ExitDelayQueueSet(address indexed previous, address indexed current);
