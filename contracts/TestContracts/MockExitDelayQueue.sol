@@ -2,7 +2,7 @@
 pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
-import "../Interfaces/colfee/IExitDelayQueueHook.sol";
+import "../Interfaces/perimeter/IExitDelayQueueHook.sol";
 
 /// @title  MockExitDelayQueue
 /// @notice Minimal test double for the real 0.8.20 `ExitDelayQueue`, implemented
@@ -24,7 +24,7 @@ import "../Interfaces/colfee/IExitDelayQueueHook.sol";
 ///         The three ERC20 / value-carrying ingress fns are present for interface
 ///         completeness but revert (the Zero surface is native-only). This is
 ///         deliberately NOT the full security model — the real queue's recovery
-///         legs and per-request index are covered by the colfee Foundry suite.
+///         legs and per-request index are covered by the perimeter Foundry suite.
 contract MockExitDelayQueue is IExitDelayQueueHook {
     struct Req {
         uint128 amount;

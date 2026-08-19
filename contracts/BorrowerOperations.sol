@@ -16,8 +16,8 @@ import "./Dependencies/console.sol";
 import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
 import "./Interfaces/IPermit2.sol";
-import "./Interfaces/colfee/IExitFeeController.sol";
-import "./Interfaces/colfee/IExitDelayQueueHook.sol";
+import "./Interfaces/perimeter/IExitFeeController.sol";
+import "./Interfaces/perimeter/IExitDelayQueueHook.sol";
 
 contract BorrowerOperations is
     LiquityBase,
@@ -28,15 +28,15 @@ contract BorrowerOperations is
     /** CONSTANT / IMMUTABLE VARIABLE ONLY */
     IPermit2 public immutable permit2;
 
-    // --- ColFee (exit-fee) hook ---
+    // --- Perimeter (exit-fee) hook ---
     // No new regular storage: the controller pointer lives in an EIP-1967-style
     // unstructured slot so `BorrowerOperations` storage-layout is unchanged.
     bytes32 private constant EXIT_FEE_CONTROLLER_SLOT =
         bytes32(uint256(keccak256("sovryn.exitFeeController")) - 1);
-    bytes32 private constant SURFACE_ZERO_WITHDRAW_COLL =
-        keccak256("COLFEE:SURFACE_ZERO_WITHDRAW_COLL");
-    bytes32 private constant SURFACE_ZERO_CLAIM_SURPLUS =
-        keccak256("COLFEE:SURFACE_ZERO_CLAIM_SURPLUS");
+    bytes32 private constant PERIMETER_SURFACE_ZERO_WITHDRAW_COLL =
+        keccak256("PERIMETER_SURFACE_ZERO_WITHDRAW_COLL");
+    bytes32 private constant PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS =
+        keccak256("PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS");
 
     // --- Security-perimeter exit-delay hook ---
     // The delay queue pointer also lives in an EIP-1967-style unstructured
@@ -823,16 +823,16 @@ contract BorrowerOperations is
             ZUSD_GAS_COMPENSATION
         );
 
-        // Send the collateral back to the user (charging the ColFee exit fee)
+        // Send the collateral back to the user (charging the Perimeter exit fee)
         _sendCollWithExitFee(activePoolCached, msg.sender, coll);
     }
 
     /**
      * Claim remaining collateral from a redemption or from a liquidation with ICR > MCR in Recovery Mode,
-     * charging the ColFee exit fee when the SURFACE_ZERO_CLAIM_SURPLUS policy is active.
-     * Fail-open like every ColFee hook: on any ColFee failure (controller missing/
+     * charging the Perimeter exit fee when the PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS policy is active.
+     * Fail-open like every Perimeter hook: on any Perimeter failure (controller missing/
      * reverting, invalid quote, fee-leg transfer failure inside the pool) the claimant
-     * receives the full surplus — a ColFee failure can never brick a claim. The
+     * receives the full surplus — a Perimeter failure can never brick a claim. The
      * non-charging path is the untouched claimColl flow (plus the ExitFeeSkipped
      * event, same convention as _sendCollWithExitFee).
      */
@@ -840,7 +840,7 @@ contract BorrowerOperations is
         uint256 gross = collSurplusPool.getCollateral(msg.sender);
         // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
         IExitFeeController.ExitFeeQuote memory q = _safeQuote(
-            SURFACE_ZERO_CLAIM_SURPLUS,
+            PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
             address(0),
             msg.sender,
             gross
@@ -865,7 +865,7 @@ contract BorrowerOperations is
             );
             if (feePaid) {
                 emit ExitFeeApplied(
-                    SURFACE_ZERO_CLAIM_SURPLUS,
+                    PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
                     msg.sender,
                     address(0),
                     address(0),
@@ -877,7 +877,7 @@ contract BorrowerOperations is
                 );
             } else {
                 emit ExitFeeSkipped(
-                    SURFACE_ZERO_CLAIM_SURPLUS,
+                    PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
                     msg.sender,
                     address(0),
                     gross,
@@ -889,7 +889,7 @@ contract BorrowerOperations is
             // !active (INACTIVE / DISABLED / INVALID_QUOTE / CONTROLLER_REVERT)
             // OR active-but-zero-fee (dust / zero-rate / gross == 0 → reason NONE).
             emit ExitFeeSkipped(
-                SURFACE_ZERO_CLAIM_SURPLUS,
+                PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
                 msg.sender,
                 address(0),
                 gross,
@@ -987,9 +987,9 @@ contract BorrowerOperations is
         }
     }
 
-    // --- ColFee (exit-fee) helpers ---
+    // --- Perimeter (exit-fee) helpers ---
 
-    /// @notice Address of the ColFee controller this instance consults. Held in
+    /// @notice Address of the Perimeter controller this instance consults. Held in
     ///         an EIP-1967-style unstructured slot (no regular-storage footprint).
     function exitFeeController() public view returns (address ctrl) {
         bytes32 slot = EXIT_FEE_CONTROLLER_SLOT;
@@ -998,7 +998,7 @@ contract BorrowerOperations is
         }
     }
 
-    /// @notice Set (or rotate) the ColFee controller this instance consults.
+    /// @notice Set (or rotate) the Perimeter controller this instance consults.
     ///         Owner-only, one call, effective for every subsequent exit.
     function setExitFeeController(address ctrl) external onlyOwner {
         require(ctrl != address(0), "EFC:zero");
@@ -1049,7 +1049,7 @@ contract BorrowerOperations is
     }
 
     /// @dev Fail-CLOSED delay quote wrapper. Resolves the single hook
-    ///      entry `quoteExitDelayFor` on the shared ColFee controller and returns
+    ///      entry `quoteExitDelayFor` on the shared Perimeter controller and returns
     ///      `(d, effOrig, effOwner)`. Two levels, deliberately distinct:
     ///        1. controller-POINTER lookup is FAIL-OPEN — a missing OR code-less
     ///           controller ⇒ perimeter unwired ⇒ `(0, raw, raw)` ⇒ pay direct
@@ -1085,13 +1085,13 @@ contract BorrowerOperations is
                 rawOriginator,
                 owner,
                 receiver,
-                SURFACE_ZERO_WITHDRAW_COLL,
+                PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
                 address(0)
             )
         returns (uint32 d_, address effOrig_, address effOwner_) {
             return (d_, effOrig_, effOwner_);
         } catch {
-            revert("COLFEE:delay-quote-failed");
+            revert("PERIMETER:delay-quote-failed");
         }
     }
 
@@ -1148,7 +1148,7 @@ contract BorrowerOperations is
         }
     }
 
-    /// @dev Settle a borrower collateral payout, charging the ColFee exit fee
+    /// @dev Settle a borrower collateral payout, charging the Perimeter exit fee
     ///      when the resolved policy is active. The fee leg uses `try/catch`
     ///      (0.6.11 native) so a fee-receiver failure never bricks the exit; on
     ///      any non-charging path the full `gross` is sent to the borrower via
@@ -1162,10 +1162,10 @@ contract BorrowerOperations is
     ) private {
         // Debt-only adjustments (repay / debt-decrease) reach here with gross == 0:
         // no collateral leaves the pool, so there is nothing to settle. Skip the
-        // controller round-trip and the ColFee event. (Baseline called
+        // controller round-trip and the Perimeter event. (Baseline called
         // sendETH(borrower, 0) here — a value-less no-op that only emitted
         // EtherSent(_, 0) / ActivePoolETHBalanceUpdated; we drop that redundant
-        // transfer, so debt-only ops emit fewer events than pre-ColFee.)
+        // transfer, so debt-only ops emit fewer events than pre-Perimeter.)
         if (gross == 0) {
             return;
         }
@@ -1183,7 +1183,7 @@ contract BorrowerOperations is
 
         // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
         IExitFeeController.ExitFeeQuote memory q = _safeQuote(
-            SURFACE_ZERO_WITHDRAW_COLL,
+            PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
             address(0),
             borrower,
             gross
@@ -1196,7 +1196,7 @@ contract BorrowerOperations is
                 // Emit only after BOTH legs settle, so an ExitFeeApplied event always
                 // implies a completed borrower payout (truthful by construction).
                 emit ExitFeeApplied(
-                    SURFACE_ZERO_WITHDRAW_COLL,
+                    PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
                     borrower,
                     address(0),
                     address(0),
@@ -1209,7 +1209,7 @@ contract BorrowerOperations is
                 return;
             } catch {
                 emit ExitFeeSkipped(
-                    SURFACE_ZERO_WITHDRAW_COLL,
+                    PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
                     borrower,
                     address(0),
                     gross,
@@ -1221,7 +1221,7 @@ contract BorrowerOperations is
             // !active (INACTIVE / DISABLED / INVALID_QUOTE / CONTROLLER_REVERT)
             // OR active-but-zero-fee (dust / zero-rate policy → q.reason == NONE).
             emit ExitFeeSkipped(
-                SURFACE_ZERO_WITHDRAW_COLL,
+                PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
                 borrower,
                 address(0),
                 gross,
@@ -1275,8 +1275,8 @@ contract BorrowerOperations is
             // An unwired queue reverts the exit with a DISTINCT selector (halt
             // monitoring) — a delay can never be silently bypassed by a missing
             // pointer.
-            require(queue != address(0), "COLFEE:queue-unset");
-            require(amount <= uint256(uint128(-1)), "COLFEE:amount-too-large");
+            require(queue != address(0), "PERIMETER:queue-unset");
+            require(amount <= uint256(uint128(-1)), "PERIMETER:amount-too-large");
 
             // PUSH native to the queue (reuses the existing fail-closed sendETH
             // primitive — ActivePool.ETH decrements by exactly `amount`, identical
@@ -1285,7 +1285,7 @@ contract BorrowerOperations is
             IExitDelayQueueHook(queue).recordReceivedNativeExit(
                 uint128(amount),
                 dl.d,
-                SURFACE_ZERO_WITHDRAW_COLL,
+                PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
                 address(0),
                 dl.effOrig,
                 dl.effOwner,
@@ -1296,9 +1296,9 @@ contract BorrowerOperations is
         }
     }
 
-    /// @notice Read-only preview of the ColFee exit fee on a Zero borrower collateral
+    /// @notice Read-only preview of the Perimeter exit fee on a Zero borrower collateral
     ///         payout of `grossColl` for `borrower`. Hard-wired to
-    ///         SURFACE_ZERO_WITHDRAW_COLL / subProduct=address(0) / actor=borrower, and
+    ///         PERIMETER_SURFACE_ZERO_WITHDRAW_COLL / subProduct=address(0) / actor=borrower, and
     ///         routes through the same `_safeQuote` the live hook uses — so the synthesized
     ///         fail-open quote on controller failure matches execution wei-for-wise. The
     ///         caller passes `grossColl` (computed from trove state); this is a thin policy
@@ -1325,7 +1325,7 @@ contract BorrowerOperations is
         )
     {
         IExitFeeController.ExitFeeQuote memory q = _safeQuote(
-            SURFACE_ZERO_WITHDRAW_COLL,
+            PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
             address(0),
             borrower,
             grossColl

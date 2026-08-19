@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.11;
 
-/// @notice ColFee test double: a fee receiver that burns essentially all the
+/// @notice Perimeter test double: a fee receiver that burns essentially all the
 ///         gas forwarded to it. consumeAll=false → burns down to a small floor
 ///         then RETURNS SUCCESS (the starvation shape: without the pool's
 ///         FEE_LEG_GAS_CAP this would leave the claimant leg out of gas);

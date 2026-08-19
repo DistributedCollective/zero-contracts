@@ -6,12 +6,12 @@ pragma experimental ABIEncoderV2;
 import "./EchidnaTester.sol";
 import "./ExitFeeControllerMock.sol";
 
-/// @title  EchidnaColFeeTester
-/// @notice Re-runs the full Zero Echidna campaign with the ColFee exit fee
+/// @title  EchidnaPerimeterTester
+/// @notice Re-runs the full Zero Echidna campaign with the Perimeter exit fee
 ///         ACTIVE, so every collateral exit driven by the actor proxies routes
 ///         through the fee hook (`_sendCollWithExitFee`) with a real fee leg.
 ///
-///         The ColFee load-bearing invariant is the inherited
+///         The Perimeter load-bearing invariant is the inherited
 ///         `echidna_ETH_balances`:
 ///           - `borrowerOperations` holds 0 ETH — the fee leg never strands ETH
 ///             in BorrowerOperations;
@@ -20,33 +20,33 @@ import "./ExitFeeControllerMock.sol";
 ///             in sync, so no ETH is created, destroyed, or double-counted by
 ///             the fee.
 ///         A fee-leg accounting bug breaks it. The two added invariants below
-///         guard that the run is genuinely exercising ColFee (not vacuous) and
+///         guard that the run is genuinely exercising Perimeter (not vacuous) and
 ///         that ETH reaches the fee receiver only through the accounted leg.
 ///
 ///         Note: the inherited `echidna_canary_*` properties are Liquity's
 ///         coverage markers and are EXPECTED to be falsified once the actors
-///         open troves / fund the pool — that is their purpose, not a ColFee
+///         open troves / fund the pool — that is their purpose, not a Perimeter
 ///         failure. The meaningful result is that `echidna_ETH_balances`,
 ///         `echidna_trove_properties`, `echidna_troves_order`,
-///         `echidna_ZUSD_global_balances`, and the two `echidna_colfee_*`
+///         `echidna_ZUSD_global_balances`, and the two `echidna_perimeter_*`
 ///         invariants below HOLD with the fee active.
 ///
 ///         Run (from repo root, project/hardhat mode so the CryptoEnv-wrapped
 ///         compile resolves — the single-file form needs a bare `solc` on PATH):
 ///           __decryptionAlreadyDone__=TRUE echidna . \
-///             --contract EchidnaColFeeTester \
+///             --contract EchidnaPerimeterTester \
 ///             --config fuzzTests/js/echidna_config.yaml
-contract EchidnaColFeeTester is EchidnaTester {
+contract EchidnaPerimeterTester is EchidnaTester {
     // Canonical deterministic Permit2 deployment address. Permit2 is not on any
-    // ColFee path, so a fixed (codeless-in-VM) address is inert here; pinning it
+    // Perimeter path, so a fixed (codeless-in-VM) address is inert here; pinning it
     // lets Echidna deploy this tester with NO constructor arguments.
     address internal constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     ExitFeeControllerMock public exitFeeCtrl;
-    ColFeeEchidnaSink public feeSink;
+    PerimeterEchidnaSink public feeSink;
 
     constructor() public payable EchidnaTester(PERMIT2) {
-        feeSink = new ColFeeEchidnaSink();
+        feeSink = new PerimeterEchidnaSink();
         exitFeeCtrl = new ExitFeeControllerMock();
         // Active policy: 1% (100 bps) of the borrower's gross collateral, paid
         // to a sink that accepts ETH (so the fee leg settles, exercising the
@@ -58,7 +58,7 @@ contract EchidnaColFeeTester is EchidnaTester {
 
     /// Guards against a vacuous run: the controller stays pinned and active, so
     /// the inherited invariants are genuinely exercised WITH the fee in the loop.
-    function echidna_colfee_controller_pinned() public view returns (bool) {
+    function echidna_perimeter_controller_pinned() public view returns (bool) {
         return borrowerOperations.exitFeeController() == address(exitFeeCtrl);
     }
 
@@ -66,11 +66,11 @@ contract EchidnaColFeeTester is EchidnaTester {
     /// real balance equals the total it recorded receiving. (Combined with the
     /// inherited pool `balance == getETH()` invariant, this closes the loop on
     /// fee-leg value conservation.)
-    function echidna_colfee_sink_synced() public view returns (bool) {
+    function echidna_perimeter_sink_synced() public view returns (bool) {
         return address(feeSink).balance == feeSink.totalReceived();
     }
 
-    function exerciseColFeeExt() external {
+    function exercisePerimeterExt() external {
         EchidnaProxy echidnaProxy = echidnaProxies[0];
         if (troveManager.getTroveDebt(address(echidnaProxy)) == 0) {
             openTroveExt(0, 1e23, 1e21);
@@ -83,8 +83,8 @@ contract EchidnaColFeeTester is EchidnaTester {
     }
 
     /// Canary: EXPECTED to be falsified once any exit charges a fee. If this
-    /// stays passing, the campaign never exercised ColFee.
-    function echidna_canary_colfee_charged() public view returns (bool) {
+    /// stays passing, the campaign never exercised Perimeter.
+    function echidna_canary_perimeter_charged() public view returns (bool) {
         return feeSink.totalReceived() == 0;
     }
 
@@ -117,14 +117,14 @@ contract EchidnaColFeeTester is EchidnaTester {
 
     /// CollSurplusPool conservation under the two-leg split: raw balance always
     /// equals the recorded ETH accounting (mirrors the inherited per-pool checks
-    /// in echidna_ETH_balances, which predates ColFee and does not cover this pool).
-    function echidna_colfee_surplus_pool_synced() public view returns (bool) {
+    /// in echidna_ETH_balances, which predates Perimeter and does not cover this pool).
+    function echidna_perimeter_surplus_pool_synced() public view returns (bool) {
         return address(collSurplusPool).balance == collSurplusPool.getETH();
     }
 }
 
 /// Minimal payable fee receiver that records what it is paid.
-contract ColFeeEchidnaSink {
+contract PerimeterEchidnaSink {
     uint256 public totalReceived;
 
     receive() external payable {

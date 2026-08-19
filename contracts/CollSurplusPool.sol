@@ -83,7 +83,7 @@ contract CollSurplusPool is CollSurplusPoolStorage, CheckContract, ICollSurplusP
     uint256 private constant FEE_LEG_GAS_CAP = 100_000;
 
     /// @notice Two-leg claim: `_feeAmount` to `_feeReceiver`, remainder to `_account`.
-    ///         Only callable by BorrowerOperations (the ColFee surplus-claim hook);
+    ///         Only callable by BorrowerOperations (the Perimeter surplus-claim hook);
     ///         `claimColl` remains the untouched non-charging path.
     ///         CEI: all effects (balance zeroing, ETH accounting) precede both external
     ///         calls, so a reentrant claim sees balances == 0 and reverts. The single

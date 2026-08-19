@@ -2,7 +2,7 @@
 
 pragma solidity 0.6.11;
 
-/// @title A generic interface for external price providers  
+/// @title A generic interface for external price providers
 interface IExternalPriceFeed {
     /// @dev The returned price should be 18-decimal value
     /// @return the prive value and a boolean stating if the query was successful

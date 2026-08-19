@@ -1,19 +1,19 @@
-// ColFee security perimeter — SR1 queue custom-error SELECTOR propagation.
+// Perimeter security perimeter — SR1 queue custom-error SELECTOR propagation.
 //
 // The real ExitDelayQueue is Solidity 0.8.20 and its onlyAllowedSource guard
 // reverts with the DISTINCT custom error `UnregisteredSource(address)` — the
 // primary fail-closed halt signal the off-chain watcher keys on. The 0.6.11
 // BorrowerOperations delay hook calls
 // `recordReceivedNativeExit` as a PLAIN external call (NOT wrapped in a
-// try/catch or re-`require` with a COLFEE: string), so that selector must
+// try/catch or re-`require` with a PERIMETER: string), so that selector must
 // BUBBLE UP UNCHANGED out of the reverting trove exit — it is neither swallowed
 // nor re-wrapped by the host.
 //
 // This regression drives a real withdrawColl/closeTrove into a queue that
 // reverts with the exact `UnregisteredSource(msg.sender)` payload and asserts
 // the returndata's leading 4 bytes equal the queue's selector (and are NOT a
-// COLFEE:-prefixed host string). The COMPANION host-side pre-check strings
-// (COLFEE:queue-unset / COLFEE:delay-quote-failed) are asserted in
+// PERIMETER:-prefixed host string). The COMPANION host-side pre-check strings
+// (PERIMETER:queue-unset / PERIMETER:delay-quote-failed) are asserted in
 // ZeroBorrowerExit.delay.test.js — those are the reverts that CANNOT bubble a
 // queue selector because they fire before/around the queue call.
 
@@ -66,7 +66,7 @@ const rawRevertData = async (from, to, data) =>
         );
     });
 
-contract("ColFee delay — SR1 queue selector propagation", async (accounts) => {
+contract("Perimeter delay — SR1 queue selector propagation", async (accounts) => {
     const [owner, alice] = accounts;
     const multisig = accounts[999];
 
@@ -119,7 +119,7 @@ contract("ColFee delay — SR1 queue selector propagation", async (accounts) => 
         );
     });
 
-    it("withdrawColl (d>0): queue UnregisteredSource selector BUBBLES UP unwrapped (not a COLFEE: string)", async () => {
+    it("withdrawColl (d>0): queue UnregisteredSource selector BUBBLES UP unwrapped (not a PERIMETER: string)", async () => {
         await openTrove({
             ICR: toBN(dec(10, 18)),
             extraParams: { from: alice, value: toBN(dec(100, "ether")) },

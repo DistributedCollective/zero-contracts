@@ -38,10 +38,10 @@ contract FunctionCaller {
 
     // --- Non-view wrapper functions used for calculating gas ---
 
-    function troveManager_getCurrentICR(address _address, uint256 _price)
-        external
-        returns (uint256)
-    {
+    function troveManager_getCurrentICR(
+        address _address,
+        uint256 _price
+    ) external returns (uint256) {
         return troveManager.getCurrentICR(_address, _price);
     }
 

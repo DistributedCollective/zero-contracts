@@ -3,7 +3,7 @@
 // Cross-pragma ingress stub for `ExitDelayQueue` (the security-perimeter delay
 // queue). The FULL interface + type/event/error catalog lives in
 // `IExitDelayQueue.sol` (0.8.20, provenance-locked to
-// DistributedCollective/colfee @ 51457b21). This stub declares ONLY the members
+// DistributedCollective/perimeter @ 51457b21). This stub declares ONLY the members
 // the 0.5.17 lending + borrower/margin product hooks actually call, so it can be
 // imported under the range pragma the product repos compile with.
 //

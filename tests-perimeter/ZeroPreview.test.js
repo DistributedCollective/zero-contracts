@@ -1,6 +1,6 @@
-// ColFee — Zero exit-fee preview helper.
+// Perimeter — Zero exit-fee preview helper.
 // previewZeroCollWithdrawExitFee(borrower, grossColl): read-only policy lookup
-// hard-wired to SURFACE_ZERO_WITHDRAW_COLL / subProduct=address(0) / actor=borrower.
+// hard-wired to PERIMETER_SURFACE_ZERO_WITHDRAW_COLL / subProduct=address(0) / actor=borrower.
 // Must agree wei-for-wei with the live _sendCollWithExitFee charge.
 
 const deploymentHelper = require("../utils/js/deploymentHelpers.js");
@@ -21,7 +21,7 @@ const NONE = 0;
 const CONTROLLER_REVERT = 4;
 const GAS_PRICE = toBN(dec(1, 9)); // 1 gwei — used to back gas out of the borrower's RBTC delta
 
-contract("ColFee — Zero exit-fee preview", async (accounts) => {
+contract("Perimeter — Zero exit-fee preview", async (accounts) => {
     const [owner, alice, bob] = accounts;
     const feeReceiver = accounts[995];
     const multisig = accounts[999];

@@ -199,7 +199,6 @@ interface ITroveManager is ILiquityBase {
         ISignatureTransfer.PermitTransferFrom memory _permit,
         bytes calldata _signature
     ) external;
-    
 
     /// @notice Update borrower's stake based on their latest collateral value
     /// @param _borrower borrower address

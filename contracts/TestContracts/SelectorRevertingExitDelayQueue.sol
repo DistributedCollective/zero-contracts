@@ -2,7 +2,7 @@
 pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
-import "../Interfaces/colfee/IExitDelayQueueHook.sol";
+import "../Interfaces/perimeter/IExitDelayQueueHook.sol";
 
 /// @title  SelectorRevertingExitDelayQueue
 /// @notice Test double for the SR1 selector-propagation regression. The

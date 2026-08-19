@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // ─────────────────────────────────────────────────────────────────────────────
 // Curated cross-pragma subset of the exit-fee controller interface, derived from
-// DistributedCollective/colfee @ 51457b21bc9a87958e99ea51325ded150422e791
+// DistributedCollective/perimeter @ 51457b21bc9a87958e99ea51325ded150422e791
 //   src/interfaces/IExitFeeController.sol
 //
 // This is a deliberate SUBSET, not a verbatim copy: it declares only the members
@@ -43,7 +43,7 @@ pragma solidity >=0.5.17 <0.9.0;
 pragma experimental ABIEncoderV2;
 
 /// @title  IExitFeeController
-/// @notice Cross-pragma interface for the Sovryn ExitFee (ColFee) controller.
+/// @notice Cross-pragma interface for the Sovryn ExitFee (Perimeter) controller.
 ///         One declaration shared by every consumer so they all resolve the
 ///         same ABI. Products compiled under a pragma this file cannot span
 ///         declare their own ABI-equivalent variant instead.
@@ -51,8 +51,8 @@ pragma experimental ABIEncoderV2;
 interface IExitFeeController {
     // ─── Types ────────────────────────────────────────────────────────────
 
-    /// @notice Reason a `ColFeeSkipped` event was emitted instead of an
-    ///         `ColFeeApplied`. NONE covers honest paths (positive charge,
+    /// @notice Reason a `PerimeterSkipped` event was emitted instead of an
+    ///         `PerimeterApplied`. NONE covers honest paths (positive charge,
     ///         dust, or actor-exemption); the rest cover off-state outcomes.
     enum SkipReason {
         NONE, // Controller computed an honest quote (charge / dust / zero-rate).
@@ -76,7 +76,7 @@ interface IExitFeeController {
     ///         tier decides: `bypass == true` exempts (`d = 0`), `bypass == false`
     ///         FORCES `globalDelaySeconds` (overriding a broader bypass). It is an
     ///         exemption toggle only — there is no per-instance delay
-    ///         duration. Copied final from colfee.
+    ///         duration. Copied final from perimeter.
     struct DelayBypassPolicy {
         bool active;
         bool bypass;

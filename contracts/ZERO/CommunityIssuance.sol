@@ -148,7 +148,9 @@ contract CommunityIssuance is
      */
     function _issueSOV(uint256 _totalZUSDDeposits) internal returns (uint256) {
         uint256 timePassedSinceLastIssuance = (block.timestamp.sub(lastIssuanceTime));
-        uint256 issuance = _getZUSDToSOV(_totalZUSDDeposits.mul(APR).mul(timePassedSinceLastIssuance).div(365 days).div(MAX_BPS));
+        uint256 issuance = _getZUSDToSOV(
+            _totalZUSDDeposits.mul(APR).mul(timePassedSinceLastIssuance).div(365 days).div(MAX_BPS)
+        );
 
         totalSOVIssued = totalSOVIssued + issuance;
         lastIssuanceTime = block.timestamp;

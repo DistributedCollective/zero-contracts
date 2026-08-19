@@ -45,11 +45,11 @@ interface ICollSurplusPool {
     function claimColl(address _account) external;
 
     /// @notice Two-leg claim: `_feeAmount` to `_feeReceiver`, remainder to `_account`.
-    ///         Only callable by BorrowerOperations (the ColFee surplus-claim hook).
+    ///         Only callable by BorrowerOperations (the Perimeter surplus-claim hook).
     ///         The fee leg is fail-open: if the fee transfer fails, `_account`
     ///         receives the full claimable balance.
     /// @param _account account whose claimable collateral is paid out
-    /// @param _feeReceiver ColFee fee destination for the fee leg
+    /// @param _feeReceiver Perimeter fee destination for the fee leg
     /// @param _feeAmount fee in wei; must not exceed the account's claimable balance
     /// @return feePaid true iff the fee transfer succeeded (caller emits the matching event)
     function claimCollWithFee(

@@ -1,4 +1,4 @@
-// ColFee security perimeter — storage-layout ZERO-DIFF regression.
+// Perimeter security perimeter — storage-layout ZERO-DIFF regression.
 //
 // Neither the Zero surplus-claim exit-fee hook NOR the borrower exit-DELAY
 // reroute adds storage to any deployed upgradeable contract: the surface ids
@@ -37,7 +37,7 @@
 //   2. overlay this repo's hardhat.config.ts (storageLayout output) into <tmp>
 //   3. (cd <tmp> && npx hardhat compile --force)
 //   4. extract the normalized layout for the three targets and overwrite
-//      tests-colfee/baselines/storage-layout.sovryn-perimeter-fee.json (keep _meta).
+//      tests-perimeter/baselines/storage-layout.sovryn-perimeter-fee.json (keep _meta).
 
 const assert = require("assert");
 const fs = require("fs");
@@ -52,7 +52,7 @@ const TARGETS = [
     "contracts/CollSurplusPool.sol:CollSurplusPool", // gains claimCollWithFee — functions only, no state
 ];
 
-describe("ColFee — storage-layout zero-diff (surplus-claim fee hook + exit-delay reroute)", () => {
+describe("Perimeter — storage-layout zero-diff (surplus-claim fee hook + exit-delay reroute)", () => {
     let baseline;
 
     before(() => {

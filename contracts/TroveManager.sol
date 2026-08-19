@@ -38,7 +38,10 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     event ZEROStakingAddressChanged(address _zeroStakingAddress);
 
     ///@param _bootstrapPeriod During bootsrap period redemptions are not allowed
-    constructor(uint256 _bootstrapPeriod, address _permit2) public TroveManagerBase(_bootstrapPeriod) {
+    constructor(
+        uint256 _bootstrapPeriod,
+        address _permit2
+    ) public TroveManagerBase(_bootstrapPeriod) {
         permit2 = IPermit2(_permit2);
     }
 

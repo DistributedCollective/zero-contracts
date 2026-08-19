@@ -1,4 +1,4 @@
-// ColFee security perimeter — Zero DELAY no-touch regression.
+// Perimeter security perimeter — Zero DELAY no-touch regression.
 //
 // With the perimeter ACTIVE (controller enabled, d>0) and the queue WIRED,
 // proves the delay reroute fires ONLY on the voluntary collateral-out chokepoint
@@ -29,7 +29,7 @@ const MIN_DELAY = 100;
 const GAS_PRICE = toBN(dec(1, 9));
 
 contract(
-    "ColFee delay — Zero no-touch (liquidation/redemption/SP-gain exempt)",
+    "Perimeter delay — Zero no-touch (liquidation/redemption/SP-gain exempt)",
     async (accounts) => {
         const [owner, alice, whale, defaulter_1] = accounts;
         const feeReceiver = accounts[995];

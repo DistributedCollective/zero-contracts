@@ -1,6 +1,6 @@
-// ColFee security perimeter — surplus-claim DELAY exemption pinning test.
+// Perimeter security perimeter — surplus-claim DELAY exemption pinning test.
 //
-// SURFACE_ZERO_CLAIM_SURPLUS is exempt by design from the exit-delay
+// PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS is exempt by design from the exit-delay
 // perimeter: surplus is involuntary in origin (full redemption or
 // recovery-mode liquidation), is not attacker-creatable without capital, and
 // rerouting it would widen the custody pool for thin marginal protection. So
@@ -35,7 +35,7 @@ const DELAY = 3600;
 const MIN_DELAY = 100;
 const GAS_PRICE = toBN(dec(1, 9));
 
-contract("ColFee delay — surplus claim EXEMPT (no-touch pinning)", async (accounts) => {
+contract("Perimeter delay — surplus claim EXEMPT (no-touch pinning)", async (accounts) => {
     const [owner, alice, whale, dennis] = accounts;
     const feeReceiver = accounts[995];
     const multisig = accounts[999];

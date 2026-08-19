@@ -1,5 +1,5 @@
-// ColFee security perimeter — Zero borrower exit DELAY hook
-// (surface SURFACE_ZERO_WITHDRAW_COLL).
+// Perimeter security perimeter — Zero borrower exit DELAY hook
+// (surface PERIMETER_SURFACE_ZERO_WITHDRAW_COLL).
 //
 // Proves the delay reroute at the single voluntary collateral-out chokepoint
 // `_sendCollWithExitFee` (reached by withdrawColl, collateral-decreasing
@@ -35,9 +35,9 @@ const ZERO_ADDRESS = th.ZERO_ADDRESS;
 const GAS_PRICE = toBN(dec(1, 9));
 const DELAY = 3600; // 1h
 const MIN_DELAY = 100;
-const SURFACE = web3.utils.keccak256("COLFEE:SURFACE_ZERO_WITHDRAW_COLL");
+const SURFACE = web3.utils.keccak256("PERIMETER_SURFACE_ZERO_WITHDRAW_COLL");
 
-contract("ColFee delay — Zero borrower exit reroute", async (accounts) => {
+contract("Perimeter delay — Zero borrower exit reroute", async (accounts) => {
     const [owner, alice, dennis] = accounts;
     const feeReceiver = accounts[995];
     const multisig = accounts[999];
@@ -370,7 +370,7 @@ contract("ColFee delay — Zero borrower exit reroute", async (accounts) => {
         const collBefore = await getTroveEntireColl(alice);
         await th.assertRevert(
             borrowerOperations.withdrawColl(toBN(dec(1, "ether")), alice, alice, { from: alice }),
-            "COLFEE:delay-quote-failed"
+            "PERIMETER:delay-quote-failed"
         );
         assert.isTrue(
             (await getTroveEntireColl(alice)).eq(collBefore),
@@ -390,7 +390,7 @@ contract("ColFee delay — Zero borrower exit reroute", async (accounts) => {
         const collBefore = await getTroveEntireColl(alice);
         await th.assertRevert(
             borrowerOperations.withdrawColl(toBN(dec(1, "ether")), alice, alice, { from: alice }),
-            "COLFEE:queue-unset"
+            "PERIMETER:queue-unset"
         );
         assert.isTrue((await getTroveEntireColl(alice)).eq(collBefore));
     });

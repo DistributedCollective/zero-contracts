@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // ─────────────────────────────────────────────────────────────────────────────
-// PROVENANCE — copied verbatim from DistributedCollective/colfee
+// PROVENANCE — copied verbatim from DistributedCollective/perimeter
 //   @ 51457b21bc9a87958e99ea51325ded150422e791
 //   src/interfaces/IExitDelayQueue.sol
 // Do NOT modify the ABI here — the queue's IExitDelayQueue is final.
@@ -63,7 +63,7 @@ interface IExitDelayQueue {
     ///         frozen at record time. Packed into 7 words.
     struct ExitRequest {
         // word 1 (128 + 64 + 64 = 256 bits):
-        uint128 amount; //    narrowed from the uint256 ColFee amount at record
+        uint128 amount; //    narrowed from the uint256 Perimeter amount at record
         uint64 createdAt; //  audit/analytics; emitted in ExitQueued
         uint64 unlockAt; //   COMPUTED by the queue = createdAt + delaySeconds
         // words 2-5:
@@ -172,7 +172,7 @@ interface IExitDelayQueue {
 
     /// @dev CALLER-SIDE NARROWING PRECONDITION. Every
     ///      `record*` takes `amount` as a **`uint128`**, deliberately NOT widened
-    ///      to `uint256`. The ColFee hook computes the user leg as a `uint256` and
+    ///      to `uint256`. The Perimeter hook computes the user leg as a `uint256` and
     ///      MUST narrow it (`uint128(userAmount)`) at the call site; that narrowing
     ///      is the caller's responsibility and MUST be preceded by the caller's own
     ///      `require(userAmount <= type(uint128).max)` (`AmountTooLarge`) so a value
