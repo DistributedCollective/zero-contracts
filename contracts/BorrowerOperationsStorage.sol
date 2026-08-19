@@ -36,4 +36,9 @@ contract BorrowerOperationsStorage is Ownable {
 
     IMassetManager public massetManager;
     IFeeDistributor public feeDistributor;
+
+    /// @notice The perimeter settlement hook `_sendCollWithExitFee` delegates to.
+    ///         Appended last so no existing slot moves; set at init and
+    ///         rotatable by the owner, mirroring `troveManagerRedeemOps`.
+    address public perimeterOps;
 }

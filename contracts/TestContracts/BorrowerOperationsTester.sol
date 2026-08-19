@@ -4,11 +4,14 @@ pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
 import "../BorrowerOperations.sol";
+import "../Dependencies/BorrowerOperationsPerimeterOps.sol";
 
 /* Tester contract inherits from BorrowerOperations, and provides external functions 
 for testing the parent's internal functions. */
 contract BorrowerOperationsTester is BorrowerOperations {
-    constructor(address _permit2) public BorrowerOperations(_permit2) {}
+    constructor(address _permit2) public BorrowerOperations(_permit2) {
+        perimeterOps = address(new BorrowerOperationsPerimeterOps());
+    }
 
     function getNewICRFromTroveChange(
         uint _coll,

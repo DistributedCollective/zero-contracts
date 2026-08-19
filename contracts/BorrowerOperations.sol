@@ -18,6 +18,7 @@ import "./Dependencies/Mynt/MyntLib.sol";
 import "./Interfaces/IPermit2.sol";
 import "./Interfaces/perimeter/IExitFeeController.sol";
 import "./Interfaces/perimeter/IExitDelayQueueHook.sol";
+import "./Dependencies/BorrowerOperationsPerimeterOps.sol";
 
 contract BorrowerOperations is
     LiquityBase,
@@ -1148,152 +1149,44 @@ contract BorrowerOperations is
         }
     }
 
-    /// @dev Settle a borrower collateral payout, charging the Perimeter exit fee
-    ///      when the resolved policy is active. The fee leg uses `try/catch`
-    ///      (0.6.11 native) so a fee-receiver failure never bricks the exit; on
-    ///      any non-charging path the full `gross` is sent to the borrower via
-    ///      the existing fail-closed `sendETH`. ActivePool's recorded ETH
-    ///      decrements by exactly `gross` either way (the reverted fee-leg
-    ///      subcall rolls back its `ETH.sub`).
+    /// @dev Settle a borrower collateral payout through the security perimeter:
+    ///      the fee leg, then the delay leg. The body runs in
+    ///      `BorrowerOperationsPerimeterOps` under `delegatecall`, so it settles
+    ///      in this proxy's context and the same transaction, and its events
+    ///      carry this address.
+    ///
+    ///      Any failure propagates unchanged. Once the perimeter resolves a
+    ///      delay the leg must escrow, so a reverting hook reverts the whole
+    ///      close or adjust rather than paying direct.
     function _sendCollWithExitFee(
         IActivePool _activePool,
         address borrower,
         uint256 gross
     ) private {
-        // Debt-only adjustments (repay / debt-decrease) reach here with gross == 0:
-        // no collateral leaves the pool, so there is nothing to settle. Skip the
-        // controller round-trip and the Perimeter event. (Baseline called
-        // sendETH(borrower, 0) here — a value-less no-op that only emitted
-        // EtherSent(_, 0) / ActivePoolETHBalanceUpdated; we drop that redundant
-        // transfer, so debt-only ops emit fewer events than pre-Perimeter.)
-        if (gross == 0) {
-            return;
-        }
-
-        // Security-perimeter delay quote — computed ONCE up-front so a single `d`
-        // governs the WHOLE exit: a fee-vault failure still escrows GROSS
-        // behind the delay and cannot bypass it. FAIL-CLOSED (except the
-        // kill-switch / unwired short-circuit): a controller revert reverts the
-        // exit. Zero has no passthrough, so originator == owner == receiver
-        // == borrower (== msg.sender on every collateral-out path). The queue is
-        // NEVER touched here — only inside the `d > 0` branch of `_payUserColl`
-        //.
-        DelayLeg memory dl;
-        (dl.d, dl.effOrig, dl.effOwner) = _safeQuoteExitDelay(borrower, borrower, borrower);
-
-        // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
-        IExitFeeController.ExitFeeQuote memory q = _safeQuote(
-            PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
-            address(0),
-            borrower,
-            gross
-        );
-
-        if (q.active && q.feeAmount > 0) {
-            try _activePool.sendETH(q.feeReceiver, q.feeAmount) {
-                // user leg (net): direct-pay OR reroute to the delay queue when d>0
-                _payUserColl(_activePool, borrower, q.netAmount, dl);
-                // Emit only after BOTH legs settle, so an ExitFeeApplied event always
-                // implies a completed borrower payout (truthful by construction).
-                emit ExitFeeApplied(
-                    PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
-                    borrower,
-                    address(0),
-                    address(0),
-                    borrower,
-                    gross,
-                    q.feeAmount,
-                    q.netAmount,
-                    q.feeReceiver
-                );
-                return;
-            } catch {
-                emit ExitFeeSkipped(
-                    PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
-                    borrower,
-                    address(0),
-                    gross,
-                    q.rateBps,
-                    uint8(IExitFeeController.SkipReason.VAULT_REVERT)
-                );
-            }
-        } else {
-            // !active (INACTIVE / DISABLED / INVALID_QUOTE / CONTROLLER_REVERT)
-            // OR active-but-zero-fee (dust / zero-rate policy → q.reason == NONE).
-            emit ExitFeeSkipped(
-                PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
+        // delegatecall to a code-less address SUCCEEDS with empty returndata,
+        // which would silently skip the fee and the delay. Require code.
+        address ops = perimeterOps;
+        checkContract(ops);
+        (bool ok, bytes memory ret) = ops.delegatecall(
+            abi.encodeWithSelector(
+                BorrowerOperationsPerimeterOps(address(0)).sendCollWithExitFee.selector,
+                _activePool,
                 borrower,
-                address(0),
-                gross,
-                q.rateBps,
-                q.reason
-            );
+                gross
+            )
+        );
+        if (!ok) {
+            assembly {
+                revert(add(ret, 0x20), mload(ret))
+            }
         }
-        // full-gross fallback (any non-charging path): direct-pay OR reroute to the
-        // delay queue when d>0 — the same up-front `d` governs both legs.
-        _payUserColl(_activePool, borrower, gross, dl);
     }
 
-    /// @dev Bundles the resolved delay-leg fields so `_payUserColl` stays a
-    ///      single-slot call and `_sendCollWithExitFee` does not run into the
-    ///      0.6.11 stack-depth limit. `d == 0` ⇒ perimeter off / bypassed /
-    ///      unwired ⇒ pay direct. Zero surface has no passthrough, so
-    ///      `effOrig`/`effOwner` are the raw identities.
-    struct DelayLeg {
-        uint32 d;
-        address effOrig;
-        address effOwner;
-    }
-
-    /// @dev Settle the (post-fee) borrower USER leg of a voluntary collateral-out.
-    ///      When the perimeter quotes no delay (`d == 0`) this is the EXISTING
-    ///      native payout, byte-for-byte unchanged (`sendETH(receiver, amount)`).
-    ///      When `d > 0` the leg is rerouted into the ExitDelayQueue: ActivePool
-    ///      PUSHES the native RBTC to the queue, immediately followed by
-    ///      `recordReceivedNativeExit` in the SAME outer tx — both INSIDE this
-    ///      `d > 0` branch so the queue is never touched until a delay is
-    ///      established off-queue, and a record revert rolls back the push
-    ///      (fail-CLOSED: after the trove state already mutated, the whole
-    ///      close/adjust reverts atomically — a bricked queue blocks Zero closes
-    ///      until the kill switch is flipped). The queue's `receive()` is
-    ///      unconditional and, via measured-receipt, credits EXACTLY `amount` when
-    ///      its surplus `>= amount` — a donation cannot brick the record.
-    function _payUserColl(
-        IActivePool _activePool,
-        address receiver,
-        uint256 amount,
-        DelayLeg memory dl
-    ) private {
-        // A net leg can be 0 on a full-fee edge; nothing to pay or escrow.
-        if (amount == 0) {
-            return;
-        }
-
-        if (dl.d > 0) {
-            address queue = exitDelayQueue();
-            // FAIL-CLOSED: once the perimeter quotes d>0 the user leg MUST escrow.
-            // An unwired queue reverts the exit with a DISTINCT selector (halt
-            // monitoring) — a delay can never be silently bypassed by a missing
-            // pointer.
-            require(queue != address(0), "PERIMETER:queue-unset");
-            require(amount <= uint256(uint128(-1)), "PERIMETER:amount-too-large");
-
-            // PUSH native to the queue (reuses the existing fail-closed sendETH
-            // primitive — ActivePool.ETH decrements by exactly `amount`, identical
-            // to the direct payout), then measured-record in the SAME outer tx.
-            _activePool.sendETH(queue, amount);
-            IExitDelayQueueHook(queue).recordReceivedNativeExit(
-                uint128(amount),
-                dl.d,
-                PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
-                address(0),
-                dl.effOrig,
-                dl.effOwner,
-                receiver
-            );
-        } else {
-            _activePool.sendETH(receiver, amount); // EXISTING native payout, unchanged
-        }
+    /// @notice Rotate the perimeter settlement hook. `onlyOwner`, mirroring
+    ///         `setTroveManagerRedeemOps`.
+    function setPerimeterOps(address _perimeterOps) external onlyOwner {
+        checkContract(_perimeterOps);
+        perimeterOps = _perimeterOps;
     }
 
     /// @notice Read-only preview of the Perimeter exit fee on a Zero borrower collateral
