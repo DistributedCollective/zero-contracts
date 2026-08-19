@@ -41,7 +41,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const { normalizedLayout } = require("./utils/storageLayout.js");
+const { normalizedLayout, rawLayout } = require("./utils/storageLayout.js");
 
 const BASELINE = path.join(__dirname, "baselines", "storage-layout.sovryn-perimeter-fee.json");
 
@@ -72,6 +72,28 @@ describe("Perimeter — storage-layout upgrade safety (surplus-claim fee hook + 
                 `baseline for ${fq} is empty (would be a false pass)`
             );
         }
+    });
+
+    // The settlement companion runs under `delegatecall` in BorrowerOperations'
+    // context, but it does NOT share BorrowerOperations' plain-storage layout:
+    // BorrowerOperations also inherits LiquityBase, so any variable declared here
+    // would sit four words earlier than the same-named variable there. Declaring
+    // no storage at all is what makes that impossible to get wrong; everything
+    // the companion needs from the caller's state arrives as an argument, and the
+    // only slots it reads directly are the EIP-1967-style ones, addressed by
+    // constant rather than by declaration order.
+    it("the settlement companion declares no storage at all", async () => {
+        const layout = await rawLayout(
+            "contracts/Dependencies/BorrowerOperationsPerimeterOps.sol:BorrowerOperationsPerimeterOps"
+        );
+        assert.deepStrictEqual(
+            layout,
+            [],
+            "BorrowerOperationsPerimeterOps declared storage: under delegatecall its slots do " +
+                "NOT line up with BorrowerOperations', so a read or write here corrupts the " +
+                "caller. Pass the value in as an argument instead.\n" +
+                `  declared: ${JSON.stringify(layout)}`
+        );
     });
 
     for (const { fq, policy } of TARGETS) {

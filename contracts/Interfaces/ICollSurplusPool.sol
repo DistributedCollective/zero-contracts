@@ -57,4 +57,26 @@ interface ICollSurplusPool {
         address _feeReceiver,
         uint256 _feeAmount
     ) external returns (bool feePaid);
+
+    /// @notice Two-leg claim that pays the remainder to `_netRecipient` instead of
+    ///         to `_account`. Only callable by BorrowerOperations. The claim is
+    ///         still resolved against `_account`'s balance and the account keeps
+    ///         its claim: the recipient only names where the net leg is sent, so
+    ///         the perimeter can escrow it in the exit delay queue. Passing
+    ///         `_account` as the recipient is exactly `claimCollWithFee`.
+    ///         A zero `_feeAmount` skips the fee leg entirely rather than making
+    ///         a zero-value call, so an uncharged-but-delayed claim does not
+    ///         report a fee that was never taken.
+    /// @param _account       account whose claimable collateral is paid out
+    /// @param _feeReceiver   Perimeter fee destination for the fee leg
+    /// @param _feeAmount     fee in wei; must not exceed the account's claimable balance
+    /// @param _netRecipient  destination of the remainder after the fee leg
+    /// @return feePaid   true iff a fee leg ran and succeeded
+    /// @return netAmount wei actually sent to `_netRecipient`
+    function claimCollWithFeeTo(
+        address _account,
+        address _feeReceiver,
+        uint256 _feeAmount,
+        address _netRecipient
+    ) external returns (bool feePaid, uint256 netAmount);
 }

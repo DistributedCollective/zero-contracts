@@ -3,28 +3,39 @@
 pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
-import "../BorrowerOperationsStorage.sol";
 import "../Interfaces/IActivePool.sol";
+import "../Interfaces/ICollSurplusPool.sol";
 import "../Interfaces/perimeter/IExitFeeController.sol";
 import "../Interfaces/perimeter/IExitDelayQueueHook.sol";
 
 /// @title  BorrowerOperationsPerimeterOps
-/// @notice Settles a Zero borrower collateral payout through the security
-///         perimeter: the exit fee leg, then the delay leg.
+/// @notice Settles a Zero borrower collateral payout, and a surplus claim,
+///         through the security perimeter: the exit fee leg, then the delay leg.
 ///
 /// @dev    Used via `delegatecall` from BorrowerOperations, the same way
-///         TroveManagerRedeemOps is used from TroveManager. It shares
-///         BorrowerOperationsStorage, so storage, `address(this)` and
-///         `msg.sender` are the caller\'s, the pointer slots it reads are the
-///         caller\'s, and the events it emits carry the caller\'s address. It
-///         declares no storage of its own.
-contract BorrowerOperationsPerimeterOps is BorrowerOperationsStorage {
+///         TroveManagerRedeemOps is used from TroveManager, so `address(this)`
+///         and `msg.sender` are the caller\'s, the unstructured pointer slots it
+///         reads are the caller\'s, and the events it emits carry the caller\'s
+///         address.
+///
+///         It declares NO STORAGE and inherits none, deliberately. A companion
+///         that inherited BorrowerOperationsStorage would appear to share the
+///         caller\'s variables while its slots sat four words earlier, because
+///         BorrowerOperations also inherits LiquityBase and this contract does
+///         not: reading `collSurplusPool` here would return
+///         BorrowerOperations\' `liquityBaseParams`. Everything this contract
+///         needs from the caller\'s state therefore arrives as an argument, and
+///         only the two EIP-1967-style slots — whose addresses are constants,
+///         not declaration order — are read directly.
+contract BorrowerOperationsPerimeterOps {
     bytes32 private constant EXIT_FEE_CONTROLLER_SLOT =
         bytes32(uint256(keccak256("sovryn.perimeterExitFeeController")) - 1);
     bytes32 private constant EXIT_DELAY_QUEUE_SLOT =
         bytes32(uint256(keccak256("sovryn.perimeterExitDelayQueue")) - 1);
     bytes32 private constant PERIMETER_SURFACE_ZERO_WITHDRAW_COLL =
         keccak256("PERIMETER_SURFACE_ZERO_WITHDRAW_COLL");
+    bytes32 private constant PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS =
+        keccak256("PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS");
 
     event ExitFeeApplied(
         bytes32 indexed surfaceId,
@@ -93,7 +104,12 @@ contract BorrowerOperationsPerimeterOps is BorrowerOperationsStorage {
         // NEVER touched here — only inside the `d > 0` branch of `_payUserColl`
         //.
         DelayLeg memory dl;
-        (dl.d, dl.effOrig, dl.effOwner) = _safeQuoteExitDelay(borrower, borrower, borrower);
+        (dl.d, dl.effOrig, dl.effOwner) = _safeQuoteExitDelay(
+            borrower,
+            borrower,
+            borrower,
+            PERIMETER_SURFACE_ZERO_WITHDRAW_COLL
+        );
 
         // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
         IExitFeeController.ExitFeeQuote memory q = _safeQuote(
@@ -199,6 +215,145 @@ contract BorrowerOperationsPerimeterOps is BorrowerOperationsStorage {
         }
     }
 
+    /// @notice Settle a surplus claim through the perimeter: the fee leg, then
+    ///         the delay leg.
+    ///
+    /// @dev    The claimant is `msg.sender`, preserved across the delegatecall
+    ///         from BorrowerOperations. The pool arrives as an argument because
+    ///         this contract declares no storage and cannot read the caller's.
+    ///
+    ///         The delay is quoted ONCE, up front, so a fee-vault failure still
+    ///         escrows the gross behind the hold and cannot bypass it — the same
+    ///         rule the collateral exit follows.
+    ///
+    ///         When the perimeter imposes no delay this is the existing claim,
+    ///         unchanged: `claimCollWithFee` on the charging path and the
+    ///         untouched `claimColl` otherwise, both paying the claimant
+    ///         directly. When it does, the pool sends the net leg to the queue
+    ///         instead and the record follows in the same transaction. A record
+    ///         failure reverts the whole claim, so a hold can never be silently
+    ///         skipped; the claimant keeps their surplus balance and can claim
+    ///         again once the queue is healthy.
+    function claimSurplusWithPerimeter(ICollSurplusPool pool) external {
+        address claimant = msg.sender;
+        uint256 gross = pool.getCollateral(claimant);
+
+        // FAIL-CLOSED: a controller revert reverts the claim. Zero has no
+        // passthrough, so originator == owner == receiver == the claimant.
+        DelayLeg memory dl;
+        (dl.d, dl.effOrig, dl.effOwner) = _safeQuoteExitDelay(
+            claimant,
+            claimant,
+            claimant,
+            PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS
+        );
+
+        // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
+        IExitFeeController.ExitFeeQuote memory q = _safeQuote(
+            PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
+            address(0),
+            claimant,
+            gross
+        );
+
+        // A quote that charges into address(0) would burn the fee, because a
+        // value call to a no-code address succeeds. Demote to the non-charging
+        // path; DISABLED is the enum's "feeReceiver == address(0)" reason.
+        if (q.active && q.feeAmount > 0 && q.feeReceiver == address(0)) {
+            q.active = false;
+            q.netAmount = gross;
+            q.reason = uint8(IExitFeeController.SkipReason.DISABLED);
+        }
+
+        address netRecipient = claimant;
+        if (dl.d > 0) {
+            netRecipient = exitDelayQueue();
+            // FAIL-CLOSED: once the perimeter quotes d>0 the net leg MUST escrow.
+            // An unwired queue reverts the claim with a DISTINCT selector — a
+            // hold can never be bypassed by a missing pointer.
+            require(netRecipient != address(0), "PERIMETER:queue-unset");
+        }
+
+        if (q.active && q.feeAmount > 0) {
+            // Two-leg split inside the pool (fee -> feeReceiver, net -> recipient);
+            // the pool's fee leg is fail-open and reports which event is truthful.
+            (bool feePaid, uint256 netAmount) = pool.claimCollWithFeeTo(
+                claimant,
+                q.feeReceiver,
+                q.feeAmount,
+                netRecipient
+            );
+            _recordSurplusExit(netRecipient, netAmount, claimant, dl);
+            if (feePaid) {
+                emit ExitFeeApplied(
+                    PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
+                    claimant,
+                    address(0),
+                    address(0),
+                    claimant,
+                    gross,
+                    q.feeAmount,
+                    q.netAmount,
+                    q.feeReceiver
+                );
+            } else {
+                emit ExitFeeSkipped(
+                    PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
+                    claimant,
+                    address(0),
+                    gross,
+                    q.rateBps,
+                    uint8(IExitFeeController.SkipReason.VAULT_REVERT)
+                );
+            }
+            return;
+        }
+
+        // !active (INACTIVE / DISABLED / INVALID_QUOTE / CONTROLLER_REVERT) OR
+        // active-but-zero-fee (dust / zero-rate / gross == 0 -> reason NONE).
+        emit ExitFeeSkipped(
+            PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
+            claimant,
+            address(0),
+            gross,
+            q.rateBps,
+            q.reason
+        );
+        if (dl.d > 0) {
+            (, uint256 netAmount) = pool.claimCollWithFeeTo(claimant, address(0), 0, netRecipient);
+            _recordSurplusExit(netRecipient, netAmount, claimant, dl);
+        } else {
+            // Untouched original path. A zero surplus falls through to
+            // claimColl's own revert, identical to a claim without the perimeter.
+            pool.claimColl(claimant);
+        }
+    }
+
+    /// @dev Record a surplus net leg the pool has just pushed into the queue.
+    ///      A no-delay claim never reaches the queue, and a fully-charged claim
+    ///      (net == 0) has nothing to escrow — the queue rejects a zero amount,
+    ///      and there is no exit for the claimant to execute later.
+    function _recordSurplusExit(
+        address queue,
+        uint256 netAmount,
+        address claimant,
+        DelayLeg memory dl
+    ) private {
+        if (dl.d == 0 || netAmount == 0) {
+            return;
+        }
+        require(netAmount <= uint256(uint128(-1)), "PERIMETER:amount-too-large");
+        IExitDelayQueueHook(queue).recordReceivedNativeExit(
+            uint128(netAmount),
+            dl.d,
+            PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
+            address(0),
+            dl.effOrig,
+            dl.effOwner,
+            claimant
+        );
+    }
+
     /// @dev Fail-open quote wrapper. On a missing/reverting controller or a
     ///      semantically invalid quote, returns a non-charging quote with
     ///      `netAmount == gross`. The validity gate uses subtraction only
@@ -271,7 +426,8 @@ contract BorrowerOperationsPerimeterOps is BorrowerOperationsStorage {
     function _safeQuoteExitDelay(
         address rawOriginator,
         address owner,
-        address receiver
+        address receiver,
+        bytes32 surfaceId
     ) private view returns (uint32 d, address effOrig, address effOwner) {
         address ctrl = exitFeeController();
         uint256 ctrlSize;
@@ -289,7 +445,7 @@ contract BorrowerOperationsPerimeterOps is BorrowerOperationsStorage {
                 rawOriginator,
                 owner,
                 receiver,
-                PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
+                surfaceId,
                 address(0)
             )
         returns (uint32 d_, address effOrig_, address effOwner_) {
