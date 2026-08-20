@@ -1,10 +1,10 @@
-// ColFee — Zero surplus-claim exit fee (SURFACE_ZERO_CLAIM_SURPLUS)
+// Perimeter — Zero surplus-claim exit fee (PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS)
 //
 // Surplus enters CollSurplusPool on full redemption (TroveManagerRedeemOps) or
 // recovery-mode liquidation with ICR > MCR; the ONLY outlet is
 // BorrowerOperations.claimCollateral(). This suite proves the pool-side two-leg
 // split (claimCollWithFee) charges the fee when the policy is active, fails
-// open on every ColFee failure, and leaves the non-charging path
+// open on every Perimeter failure, and leaves the non-charging path
 // state-equivalent to the untouched claimColl flow.
 
 const deploymentHelper = require("../utils/js/deploymentHelpers.js");
@@ -12,7 +12,7 @@ const testHelpers = require("../utils/js/testHelpers.js");
 const {
     assertRevertWithReason,
     assertSurface,
-    SURFACE_ZERO_CLAIM_SURPLUS,
+    PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
 } = require("./utils/assertions.js");
 const timeMachine = require("ganache-time-traveler");
 
@@ -40,7 +40,7 @@ const CONTROLLER_REVERT = 4;
 const VAULT_REVERT = 5;
 const GAS_PRICE = toBN(dec(1, 9));
 
-contract("ColFee — Zero surplus-claim exit fee", async (accounts) => {
+contract("Perimeter — Zero surplus-claim exit fee", async (accounts) => {
     const [owner, alice, whale] = accounts;
     const feeReceiver = accounts[995];
     const multisig = accounts[999];
@@ -186,10 +186,10 @@ contract("ColFee — Zero surplus-claim exit fee", async (accounts) => {
         const ev = getEvent(tx, "ExitFeeApplied");
         assert.isDefined(ev, "ExitFeeApplied not emitted");
         // Pins the surplus claim to its OWN surface: the controller mock ignores
-        // surfaceId, so a hook quoting SURFACE_ZERO_WITHDRAW_COLL here would charge
+        // surfaceId, so a hook quoting PERIMETER_SURFACE_ZERO_WITHDRAW_COLL here would charge
         // the borrower-exit policy on surplus claims and every other assertion in
         // this file would still pass.
-        assertSurface(ev, SURFACE_ZERO_CLAIM_SURPLUS, "claimCollateral ExitFeeApplied");
+        assertSurface(ev, PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS, "claimCollateral ExitFeeApplied");
         assert.equal(ev.args.actor, alice);
         assert.equal(ev.args.recipient, alice);
         assert.equal(ev.args.asset, ZERO_ADDRESS);
@@ -224,7 +224,7 @@ contract("ColFee — Zero surplus-claim exit fee", async (accounts) => {
 
         const ev = getEvent(tx, "ExitFeeSkipped");
         assert.isDefined(ev, "ExitFeeSkipped not emitted");
-        assertSurface(ev, SURFACE_ZERO_CLAIM_SURPLUS, "claimCollateral ExitFeeSkipped");
+        assertSurface(ev, PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS, "claimCollateral ExitFeeSkipped");
         assert.equal(toBN(ev.args.reason).toNumber(), CONTROLLER_REVERT);
         assert.isTrue(toBN(ev.args.grossAmount).eq(gross));
         assert.isUndefined(getEvent(tx, "ExitFeeApplied"));
@@ -597,7 +597,7 @@ contract("ColFee — Zero surplus-claim exit fee", async (accounts) => {
         // try/catch in the hook — a pool-side revert must surface loudly rather than
         // silently degrade a fee-active claim into an unfee'd one. This test PINS the
         // deployment ordering: the CollSurplusPool implementation upgrade must land
-        // before SURFACE_ZERO_CLAIM_SURPLUS is activated (handled atomically in one SIP).
+        // before PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS is activated (handled atomically in one SIP).
         const mock = await LegacyCollSurplusPoolMock.new();
         await mock.setBO(borrowerOperations.address);
         await mock.setSurplus(alice, { value: dec(1, "ether") });

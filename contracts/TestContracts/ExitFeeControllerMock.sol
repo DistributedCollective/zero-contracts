@@ -2,10 +2,10 @@
 pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
-import "../Interfaces/colfee/IExitFeeController.sol";
+import "../Interfaces/perimeter/IExitFeeController.sol";
 
 /// @title  ExitFeeControllerMock
-/// @notice Test double for the ColFee controller. NOT production code — lives in
+/// @notice Test double for the Perimeter controller. NOT production code — lives in
 ///         TestContracts/ only. The production controller is Solidity 0.8.20 and
 ///         cannot be compiled into the 0.6.11 zero-contracts workspace, so the
 ///         hooks are exercised against this configurable stand-in.

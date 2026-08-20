@@ -1,5 +1,5 @@
-// ColFee — Zero borrower collateral-exit hook: withdrawColl / adjustTrove legs.
-// Surface: SURFACE_ZERO_WITHDRAW_COLL
+// Perimeter — Zero borrower collateral-exit hook: withdrawColl / adjustTrove legs.
+// Surface: PERIMETER_SURFACE_ZERO_WITHDRAW_COLL
 // Covers the `_moveTokensAndETHfromAdjustment` hook reached by:
 //   - withdrawColl(amount, ...)
 //   - adjustTrove(_collWithdrawal>0, _isDebtIncrease=false, msg.value=0)
@@ -14,7 +14,7 @@ const testHelpers = require("../utils/js/testHelpers.js");
 const {
     assertRevertWithReason,
     assertSurface,
-    SURFACE_ZERO_WITHDRAW_COLL,
+    PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
 } = require("./utils/assertions.js");
 const timeMachine = require("ganache-time-traveler");
 
@@ -36,7 +36,7 @@ const CONTROLLER_REVERT = 4;
 
 const GAS_PRICE = toBN(dec(1, 9)); // 1 gwei — used to back out gas cost from the borrower's RBTC delta
 
-contract("ColFee — Zero borrower collateral exit (adjust/withdraw)", async (accounts) => {
+contract("Perimeter — Zero borrower collateral exit (adjust/withdraw)", async (accounts) => {
     const [owner, alice, bob] = accounts;
     const feeReceiver = accounts[995];
     const multisig = accounts[999];
@@ -163,7 +163,7 @@ contract("ColFee — Zero borrower collateral exit (adjust/withdraw)", async (ac
 
         const ev = getEvent(tx, "ExitFeeApplied");
         assert.isDefined(ev, "ExitFeeApplied not emitted");
-        assertSurface(ev, SURFACE_ZERO_WITHDRAW_COLL, "withdrawColl ExitFeeApplied");
+        assertSurface(ev, PERIMETER_SURFACE_ZERO_WITHDRAW_COLL, "withdrawColl ExitFeeApplied");
         assert.equal(ev.args.actor, alice);
         assert.equal(ev.args.asset, ZERO_ADDRESS);
         assert.equal(ev.args.subProduct, ZERO_ADDRESS);
@@ -351,7 +351,7 @@ contract("ColFee — Zero borrower collateral exit (adjust/withdraw)", async (ac
         );
         const ev = getEvent(tx, "ExitFeeSkipped");
         assert.isDefined(ev, "ExitFeeSkipped not emitted");
-        assertSurface(ev, SURFACE_ZERO_WITHDRAW_COLL, "withdrawColl ExitFeeSkipped");
+        assertSurface(ev, PERIMETER_SURFACE_ZERO_WITHDRAW_COLL, "withdrawColl ExitFeeSkipped");
         assert.equal(toBN(ev.args.reason).toNumber(), CONTROLLER_REVERT);
         assert.isUndefined(getEvent(tx, "ExitFeeApplied"));
     });
@@ -525,7 +525,7 @@ contract("ColFee — Zero borrower collateral exit (adjust/withdraw)", async (ac
         assert.equal(toBN(ev.args.reason).toNumber(), INACTIVE);
     });
 
-    it("debt-only adjustTrove (gross==0) emits no ColFee event and skips the controller", async () => {
+    it("debt-only adjustTrove (gross==0) emits no Perimeter event and skips the controller", async () => {
         // Repay / debt-only adjustments move no collateral → the hook must short-circuit
         // (no wasted quoteExitFee round-trip, no spurious ExitFeeSkipped).
         await openRoomyTrove(alice);
@@ -550,7 +550,7 @@ contract("ColFee — Zero borrower collateral exit (adjust/withdraw)", async (ac
             (await troveManager.Troves(alice))[0].gt(debtBefore),
             "debt did not increase — setup invalid"
         );
-        assert.isUndefined(getEvent(tx, "ExitFeeApplied"), "no ColFee event on a debt-only op");
-        assert.isUndefined(getEvent(tx, "ExitFeeSkipped"), "no ColFee event on a debt-only op");
+        assert.isUndefined(getEvent(tx, "ExitFeeApplied"), "no Perimeter event on a debt-only op");
+        assert.isUndefined(getEvent(tx, "ExitFeeSkipped"), "no Perimeter event on a debt-only op");
     });
 });

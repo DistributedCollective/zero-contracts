@@ -2,10 +2,10 @@
     "_meta": {
         "purpose": "Storage-layout zero-diff baseline for the Zero surplus-claim exit fee.",
         "baseRef": "sovryn-perimeter-fee @ b6584a6",
-        "note": "Normalized solc storageLayout (AST id suffixes after ')' stripped) for the upgradeable BorrowerOperations and CollSurplusPool proxies plus ActivePool, captured from the UNMODIFIED b6584a6 tree, before the surplus-claim fee hook was applied. tests-colfee/StorageLayout.zerodiff.test.js asserts the current tree's layout is identical — proving the hook appends NO state. Regenerate only on an intentional, reviewed layout change (see the test header).",
+        "note": "Normalized solc storageLayout (AST id suffixes after ')' stripped) for the upgradeable BorrowerOperations and CollSurplusPool proxies plus ActivePool, captured from the UNMODIFIED b6584a6 tree, before the surplus-claim fee hook was applied. tests-perimeter/StorageLayout.zerodiff.test.js asserts the current tree's layout is identical — proving the hook appends NO state. Regenerate only on an intentional, reviewed layout change (see the test header).",
         "consumers": [
-            "tests-colfee/StorageLayout.zerodiff.test.js",
-            "tests-colfee/utils/storageLayout.js"
+            "tests-perimeter/StorageLayout.zerodiff.test.js",
+            "tests-perimeter/utils/storageLayout.js"
         ]
     },
     "contracts/BorrowerOperations.sol:BorrowerOperations": [

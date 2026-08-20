@@ -1,9 +1,9 @@
-// ColFee — Zero borrower-exit hook: no-touch + invariant suite.
+// Perimeter — Zero borrower-exit hook: no-touch + invariant suite.
 //
 // Proves:
 //  - Fee-receiver failure passthrough: a reverting feeReceiver is caught by the
 //    try/catch fee leg; the borrower still receives the full gross and the exit
-//    completes (ExitFeeSkipped(VAULT_REVERT)). ColFee infra failure cannot brick
+//    completes (ExitFeeSkipped(VAULT_REVERT)). Perimeter infra failure cannot brick
 //    a borrower exit.
 //  - No-touch: redemption, liquidation, and stability-pool ETH-gain withdrawals
 //    route their collateral through TroveManager / StabilityPool — NOT through
@@ -12,7 +12,7 @@
 
 const deploymentHelper = require("../utils/js/deploymentHelpers.js");
 const testHelpers = require("../utils/js/testHelpers.js");
-const { assertSurface, SURFACE_ZERO_WITHDRAW_COLL } = require("./utils/assertions.js");
+const { assertSurface, PERIMETER_SURFACE_ZERO_WITHDRAW_COLL } = require("./utils/assertions.js");
 const timeMachine = require("ganache-time-traveler");
 
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol");
@@ -31,7 +31,7 @@ const NONE = 0;
 const VAULT_REVERT = 5;
 const GAS_PRICE = toBN(dec(1, 9));
 
-contract("ColFee — Zero borrower exit: no-touch + invariants", async (accounts) => {
+contract("Perimeter — Zero borrower exit: no-touch + invariants", async (accounts) => {
     const [owner, alice, bob, whale, defaulter_1] = accounts;
     const feeReceiver = accounts[995];
     const multisig = accounts[999];
@@ -76,7 +76,7 @@ contract("ColFee — Zero borrower exit: no-touch + invariants", async (accounts
         );
         const ev = getEvent(tx, "ExitFeeApplied");
         assert.isDefined(ev, "positive control: ExitFeeApplied not emitted");
-        assertSurface(ev, SURFACE_ZERO_WITHDRAW_COLL, "positive control ExitFeeApplied");
+        assertSurface(ev, PERIMETER_SURFACE_ZERO_WITHDRAW_COLL, "positive control ExitFeeApplied");
         assert.isTrue(toBN(ev.args.feeAmount).eq(expectedFee));
     };
 
@@ -159,7 +159,7 @@ contract("ColFee — Zero borrower exit: no-touch + invariants", async (accounts
 
         const ev = getEvent(tx, "ExitFeeSkipped");
         assert.isDefined(ev, "ExitFeeSkipped not emitted");
-        assertSurface(ev, SURFACE_ZERO_WITHDRAW_COLL, "VAULT_REVERT ExitFeeSkipped");
+        assertSurface(ev, PERIMETER_SURFACE_ZERO_WITHDRAW_COLL, "VAULT_REVERT ExitFeeSkipped");
         assert.equal(toBN(ev.args.reason).toNumber(), VAULT_REVERT);
         assert.equal(
             toBN(ev.args.rateBps).toNumber(),

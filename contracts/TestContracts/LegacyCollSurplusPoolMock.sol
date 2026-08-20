@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.11;
 
-/// @notice ColFee test double simulating the LIVE (pre-upgrade) CollSurplusPool
+/// @notice Perimeter test double simulating the LIVE (pre-upgrade) CollSurplusPool
 ///         implementation: `claimColl` exists but `claimCollWithFee` does NOT,
 ///         and there is no fallback — so the hook's pool call reverts on the
 ///         missing selector, reproducing the surface-activated-before-pool-

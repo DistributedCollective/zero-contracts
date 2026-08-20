@@ -161,8 +161,8 @@ const config: HardhatUserConfig = {
                         enabled: true,
                         runs: 100,
                     },
-                    // Emit per-contract storageLayout so the ColFee storage-layout
-                    // zero-diff regression (tests-colfee/StorageLayout.zerodiff.test.js)
+                    // Emit per-contract storageLayout so the Perimeter storage-layout
+                    // zero-diff regression (tests-perimeter/StorageLayout.zerodiff.test.js)
                     // can assert the surplus-claim fee hook adds NO state to the
                     // upgradeable BorrowerOperations / CollSurplusPool proxies or
                     // ActivePool. Additive solc output; does not affect bytecode.

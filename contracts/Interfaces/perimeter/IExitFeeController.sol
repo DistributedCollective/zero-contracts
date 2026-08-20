@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // ─────────────────────────────────────────────────────────────────────────────
-// Vendored copy of the ColFee exit-fee controller interface, taken from
-// DistributedCollective/colfee @ c85f60aef91bc644517cf1b3ea7c5e8c565f4ca5
+// Vendored copy of the Perimeter exit-fee controller interface, taken from
+// DistributedCollective/perimeter @ c85f60aef91bc644517cf1b3ea7c5e8c565f4ca5
 //   src/interfaces/IExitFeeController.sol
 // Do not change the declarations here: the binding property is ABI equality with
 // the deployed controller. To pick up an interface change, change it upstream,
@@ -27,7 +27,7 @@ pragma solidity >=0.5.17 <0.9.0;
 pragma experimental ABIEncoderV2;
 
 /// @title  IExitFeeController
-/// @notice Cross-pragma interface for the Sovryn ExitFee (ColFee) controller.
+/// @notice Cross-pragma interface for the Sovryn ExitFee (Perimeter) controller.
 ///         One declaration shared by every consumer so they all resolve the
 ///         same ABI. Products compiled under a pragma this file cannot span
 ///         declare their own ABI-equivalent variant instead.
@@ -35,8 +35,8 @@ pragma experimental ABIEncoderV2;
 interface IExitFeeController {
     // ─── Types ────────────────────────────────────────────────────────────
 
-    /// @notice Reason a `ColFeeSkipped` event was emitted instead of an
-    ///         `ColFeeApplied`. NONE covers honest paths (positive charge,
+    /// @notice Reason a `PerimeterSkipped` event was emitted instead of an
+    ///         `PerimeterApplied`. NONE covers honest paths (positive charge,
     ///         dust, or actor-exemption); the rest cover off-state outcomes.
     enum SkipReason {
         NONE, // Controller computed an honest quote (charge / dust / zero-rate).

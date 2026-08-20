@@ -1,5 +1,5 @@
-// ColFee — Zero borrower collateral-exit hook: closeTrove leg.
-// Surface: SURFACE_ZERO_WITHDRAW_COLL
+// Perimeter — Zero borrower collateral-exit hook: closeTrove leg.
+// Surface: PERIMETER_SURFACE_ZERO_WITHDRAW_COLL
 //
 // closeTrove() returns the trove's entire collateral to the borrower; this
 // suite proves the exit fee is charged on that payout and that close invariants
@@ -8,7 +8,7 @@
 
 const deploymentHelper = require("../utils/js/deploymentHelpers.js");
 const testHelpers = require("../utils/js/testHelpers.js");
-const { assertSurface, SURFACE_ZERO_WITHDRAW_COLL } = require("./utils/assertions.js");
+const { assertSurface, PERIMETER_SURFACE_ZERO_WITHDRAW_COLL } = require("./utils/assertions.js");
 const timeMachine = require("ganache-time-traveler");
 
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol");
@@ -25,7 +25,7 @@ const NONE = 0;
 const CONTROLLER_REVERT = 4;
 const GAS_PRICE = toBN(dec(1, 9));
 
-contract("ColFee — Zero borrower collateral exit (closeTrove)", async (accounts) => {
+contract("Perimeter — Zero borrower collateral exit (closeTrove)", async (accounts) => {
     const [owner, alice, dennis] = accounts;
     const feeReceiver = accounts[995];
     const multisig = accounts[999];
@@ -127,7 +127,7 @@ contract("ColFee — Zero borrower collateral exit (closeTrove)", async (account
         const ev = getEvent(tx, "ExitFeeApplied");
         assert.isDefined(ev, "ExitFeeApplied not emitted");
         // closeTrove settles through the same borrower-exit surface as withdrawColl
-        assertSurface(ev, SURFACE_ZERO_WITHDRAW_COLL, "closeTrove ExitFeeApplied");
+        assertSurface(ev, PERIMETER_SURFACE_ZERO_WITHDRAW_COLL, "closeTrove ExitFeeApplied");
         assert.equal(ev.args.actor, alice);
         assert.equal(ev.args.recipient, alice);
         assert.equal(ev.args.asset, ZERO_ADDRESS);
