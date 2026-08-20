@@ -30,12 +30,12 @@ async function assertRevertWithReason(txPromise, expected) {
 }
 
 /// Perimeter surface ids as the hooks compute them on-chain
-/// (`keccak256("PERIMETER:SURFACE_...")`). Asserting these on the emitted events
+/// (`keccak256("PERIMETER_SURFACE_...")`). Asserting these on the emitted events
 /// pins each hook to its OWN surface: the controller mock ignores `surfaceId`,
 /// so without this a hook quoting the wrong surface would charge the wrong
 /// policy in production and every test would still pass.
 /// Computed lazily — `web3` is a test-runtime global, not available at require time.
-const surfaceId = (name) => web3.utils.keccak256(`PERIMETER:${name}`);
+const surfaceId = (name) => web3.utils.keccak256(name);
 const PERIMETER_SURFACE_ZERO_WITHDRAW_COLL = () =>
     surfaceId("PERIMETER_SURFACE_ZERO_WITHDRAW_COLL");
 const PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS = () =>

@@ -33,9 +33,9 @@ contract BorrowerOperations is
     bytes32 private constant EXIT_FEE_CONTROLLER_SLOT =
         bytes32(uint256(keccak256("sovryn.perimeterExitFeeController")) - 1);
     bytes32 private constant PERIMETER_SURFACE_ZERO_WITHDRAW_COLL =
-        keccak256("PERIMETER:PERIMETER_SURFACE_ZERO_WITHDRAW_COLL");
+        keccak256("PERIMETER_SURFACE_ZERO_WITHDRAW_COLL");
     bytes32 private constant PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS =
-        keccak256("PERIMETER:PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS");
+        keccak256("PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS");
 
     event ExitFeeControllerSet(address indexed previous, address indexed current);
     event ExitFeeApplied(
