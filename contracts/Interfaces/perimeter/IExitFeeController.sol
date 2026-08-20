@@ -35,8 +35,8 @@ pragma experimental ABIEncoderV2;
 interface IExitFeeController {
     // ─── Types ────────────────────────────────────────────────────────────
 
-    /// @notice Reason a `PerimeterSkipped` event was emitted instead of an
-    ///         `PerimeterApplied`. NONE covers honest paths (positive charge,
+    /// @notice Reason a `ExitFeeSkipped` event was emitted instead of an
+    ///         `ExitFeeApplied`. NONE covers honest paths (positive charge,
     ///         dust, or actor-exemption); the rest cover off-state outcomes.
     enum SkipReason {
         NONE, // Controller computed an honest quote (charge / dust / zero-rate).
