@@ -10,7 +10,7 @@
 
 const { assert } = require("chai");
 
-const NOT_REVERTED = "COLFEE_ASSERT_NOT_REVERTED";
+const NOT_REVERTED = "PERIMETER_ASSERT_NOT_REVERTED";
 
 /// Assert `txPromise` reverts AND that the revert reason contains `expected`.
 async function assertRevertWithReason(txPromise, expected) {
