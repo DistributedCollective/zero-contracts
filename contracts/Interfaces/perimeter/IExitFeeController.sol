@@ -15,8 +15,8 @@
 // members declared here. In particular
 //   quoteExitDelayFor(address,address,address,bytes32,address)
 //     view returns (uint32, address, address)
-// is byte-identical to upstream and MUST stay so — `BorrowerOperations.
-// _safeQuoteExitDelay` calls it.
+// is byte-identical to upstream and MUST stay so — the perimeter settlement
+// companion calls it.
 //
 // To update: re-derive from upstream at a known SHA rather than blind-copying
 // (a copy that trims back to the upstream member list would delete
@@ -157,7 +157,7 @@ interface IExitFeeController {
     ///         rawOriginator, owner)` (pays direct without touching the queue).
     ///         Otherwise resolves the surface-scoped effective actors, quotes on
     ///         `effOrig`, and returns all three — so the quote and the record use
-    ///         the SAME identity (Finding 2). The hook MUST ignore `effOrig` /
+    ///         the SAME identity. The hook MUST ignore `effOrig` /
     ///         `effOwner` and pay direct whenever `d == 0`.
     /// @return d        Delay seconds to escrow for (0 ⇒ off / inactive / bypassed).
     /// @return effOrig  Effective originator (raw, or passthrough→receiver).

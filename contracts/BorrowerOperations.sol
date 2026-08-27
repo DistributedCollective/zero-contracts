@@ -50,6 +50,7 @@ contract BorrowerOperations is
 
     event ExitFeeControllerSet(address indexed previous, address indexed current);
     event ExitDelayQueueSet(address indexed previous, address indexed current);
+    event PerimeterOpsSet(address indexed previous, address indexed current);
     event ExitFeeApplied(
         bytes32 indexed surfaceId,
         address indexed actor,
@@ -997,53 +998,6 @@ contract BorrowerOperations is
         emit ExitDelayQueueSet(prev, queue);
     }
 
-    /// @dev Fail-CLOSED delay quote wrapper. Resolves the single hook
-    ///      entry `quoteExitDelayFor` on the shared Perimeter controller and returns
-    ///      `(d, effOrig, effOwner)`. Two levels, deliberately distinct:
-    ///        1. controller-POINTER lookup is FAIL-OPEN — a missing OR code-less
-    ///           controller ⇒ perimeter unwired ⇒ `(0, raw, raw)` ⇒ pay direct
-    ///           (mirrors the fee path; also, 0.6.11 try/catch does NOT catch a
-    ///           call to a no-code address, so the extcodesize guard is required);
-    ///        2. once a controller is resolved, the `quoteExitDelayFor` CALL is
-    ///           FAIL-CLOSED — a revert reverts the whole exit and MUST NOT be
-    ///           interpreted as `d = 0`-direct (that would silently disable the
-    ///           perimeter — the hazard this guards against). Uses a DISTINCT revert selector for
-    ///           halt monitoring.
-    ///      The `!securityPerimeterEnabled` short-circuit is the FIRST statement
-    ///      inside `quoteExitDelayFor`, so a healthy-but-disabled perimeter returns
-    ///      `(0, raw, owner)` normally (liveness escape). The hook ignores
-    ///      `effOrig`/`effOwner` whenever `d == 0`.
-    function _safeQuoteExitDelay(
-        address rawOriginator,
-        address owner,
-        address receiver
-    ) private view returns (uint32 d, address effOrig, address effOwner) {
-        address ctrl = exitFeeController();
-        uint256 ctrlSize;
-        assembly {
-            ctrlSize := extcodesize(ctrl)
-        }
-        // Level 1 — FAIL-OPEN pointer lookup: unwired/unreachable ⇒ direct pay.
-        // Raw identities are returned but the caller ignores them when d == 0.
-        if (ctrl == address(0) || ctrlSize == 0) {
-            return (0, rawOriginator, owner);
-        }
-        // Level 2 — FAIL-CLOSED quote: a controller revert reverts the exit.
-        try
-            IExitFeeController(ctrl).quoteExitDelayFor(
-                rawOriginator,
-                owner,
-                receiver,
-                PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
-                address(0)
-            )
-        returns (uint32 d_, address effOrig_, address effOwner_) {
-            return (d_, effOrig_, effOwner_);
-        } catch {
-            revert("PERIMETER:delay-quote-failed");
-        }
-    }
-
     /// @dev Fail-open quote wrapper. On a missing/reverting controller or a
     ///      semantically invalid quote, returns a non-charging quote with
     ///      `netAmount == gross`. The validity gate uses subtraction only
@@ -1143,7 +1097,9 @@ contract BorrowerOperations is
     ///         `setTroveManagerRedeemOps`.
     function setPerimeterOps(address _perimeterOps) external onlyOwner {
         checkContract(_perimeterOps);
+        address previous = perimeterOps;
         perimeterOps = _perimeterOps;
+        emit PerimeterOpsSet(previous, _perimeterOps);
     }
 
     /// @notice Read-only preview of the Perimeter exit fee on a Zero borrower collateral

@@ -119,6 +119,15 @@ contract BorrowerOperationsPerimeterOps {
             gross
         );
 
+        // A quote that charges into address(0) would burn the fee, because a
+        // value call to a no-code address succeeds. Demote to the non-charging
+        // path, the same guard the surplus-claim leg applies.
+        if (q.active && q.feeAmount > 0 && q.feeReceiver == address(0)) {
+            q.active = false;
+            q.netAmount = gross;
+            q.reason = uint8(IExitFeeController.SkipReason.DISABLED);
+        }
+
         if (q.active && q.feeAmount > 0) {
             try _activePool.sendETH(q.feeReceiver, q.feeAmount) {
                 // user leg (net): direct-pay OR reroute to the delay queue when d>0
