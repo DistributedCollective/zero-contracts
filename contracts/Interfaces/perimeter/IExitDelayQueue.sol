@@ -1,25 +1,4 @@
 // SPDX-License-Identifier: MIT
-// ─────────────────────────────────────────────────────────────────────────────
-// PROVENANCE — copied verbatim from DistributedCollective/perimeter
-//   @ 51457b21bc9a87958e99ea51325ded150422e791
-//   src/interfaces/IExitDelayQueue.sol
-// Do NOT modify the ABI here — the queue's IExitDelayQueue is final.
-// To update: change upstream, re-copy, bump the SHA in this header.
-//
-// This file is the authoritative type/event/error + ABI catalog, kept for ABI
-// parity and off-chain tooling. Upstream pins `0.8.20`; here the pragma is
-// WIDENED to `>=0.8.4 <0.9.0` (mirroring the range-pragma convention already used
-// for the copied `IExitFeeController.sol`) so it builds against this repo's
-// configured 0.8.x compilers. The **ABI is ABI-identical** to upstream (all four
-// `record*` signatures, event param lists/indexing, and the full error catalog
-// incl. `UnregisteredSource(address)` match byte-for-byte); the only NON-ABI
-// divergences are the widened pragma and **whitespace/line-wrap normalized by
-// this repo's prettier** (some event/function declarations are re-wrapped). So a
-// re-copy MUST compare ABI/selectors, not raw bytes. It is NOT importable from the
-// 0.5.17 product hosts (custom `error`s + struct returns need 0.8.x); the 0.5.x
-// hooks call the queue through the minimal cross-pragma stub
-// `IExitDelayQueueHook.sol` (the four `record*` fns), whose signatures are kept
-// byte-for-byte identical to the ones declared below.
 // aderyn-ignore-next-line(unspecific-solidity-pragma)
 pragma solidity >=0.8.4 <0.9.0;
 
@@ -28,14 +7,11 @@ pragma solidity >=0.8.4 <0.9.0;
 ///         per-request escrow that holds the *user* leg of an exit for a
 ///         configurable delay so a detected theft can be blocked (frozen or
 ///         blacklisted) and routed to recovery before the funds leave.
-///
-///         This interface mirrors the queue's complete function catalog
-///         and its event/error catalog, and declares the shared types.
-///
-///         Types (enums/structs) are declared here so cross-pragma callers
-///         and off-chain tooling share one source of truth. The queue itself
-///         is 0.8.20 UUPS; the four `record*` ingress fns are consumed from
-///         0.5.x / 0.6.x product hosts via a minimal interface stub.
+/// @dev    Declares the shared types so cross-pragma callers and off-chain
+///         tooling share one source of truth; the pragma range is widened so
+///         this repo's 0.8.x compilers can import it. The 0.5.x / 0.6.x
+///         product hosts consume the four `record*` fns via the minimal
+///         cross-pragma stub `IExitDelayQueueHook.sol` instead.
 interface IExitDelayQueue {
     // ─── Types ───────────────────────────────────────────────────
 

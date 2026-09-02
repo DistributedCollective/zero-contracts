@@ -1,29 +1,5 @@
 // SPDX-License-Identifier: MIT
 // ─────────────────────────────────────────────────────────────────────────────
-// Curated cross-pragma subset of the exit-fee controller interface, derived from
-// DistributedCollective/perimeter @ 51457b21bc9a87958e99ea51325ded150422e791
-//   src/interfaces/IExitFeeController.sol
-//
-// This is a deliberate SUBSET, not a verbatim copy: it declares only the members
-// the product hooks call — `quoteExitFee`, the delay members `quoteExitDelayFor`
-// / `quoteExitDelay` / `effectiveActor`, and the bypass/passthrough read views.
-// It omits the upstream governance, enumeration and admin surface, which is used
-// only by the 0.8.20 controller implementation and its tooling, never by a
-// 0.6.11 hook.
-//
-// The binding property is ABI equality with the deployed controller for the
-// members declared here. In particular
-//   quoteExitDelayFor(address,address,address,bytes32,address)
-//     view returns (uint32, address, address)
-// is byte-identical to upstream and MUST stay so — the perimeter settlement
-// companion calls it.
-//
-// To update: re-derive from upstream at a known SHA rather than blind-copying
-// (a copy that trims back to the upstream member list would delete
-// `quoteExitDelayFor`), keep the subset to what the hosts need, and bump the SHA
-// above. Local formatting follows this repo's formatter, so the file is not
-// byte-identical to the upstream source.
-// ─────────────────────────────────────────────────────────────────────────────
 // Range pragma is intentional: the same declarations are compiled under Solidity
 // 0.5.17, 0.6.11 (this repo), and 0.8.20.
 // aderyn-ignore-next-line(unspecific-solidity-pragma)
@@ -48,6 +24,9 @@ pragma experimental ABIEncoderV2;
 ///         same ABI. Products compiled under a pragma this file cannot span
 ///         declare their own ABI-equivalent variant instead.
 ///         Zero calls only `quoteExitFee`; the rest is declared for completeness.
+/// @dev    `quoteExitDelayFor(address,address,address,bytes32,address) view
+///         returns (uint32,address,address)` must stay ABI-identical, as
+///         other perimeter components call it by that exact selector.
 interface IExitFeeController {
     // ─── Types ────────────────────────────────────────────────────────────
 
@@ -76,7 +55,7 @@ interface IExitFeeController {
     ///         tier decides: `bypass == true` exempts (`d = 0`), `bypass == false`
     ///         FORCES `globalDelaySeconds` (overriding a broader bypass). It is an
     ///         exemption toggle only — there is no per-instance delay
-    ///         duration. Copied final from perimeter.
+    ///         duration.
     struct DelayBypassPolicy {
         bool active;
         bool bypass;
