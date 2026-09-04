@@ -36,6 +36,8 @@
     "report:period-totals-monthly": "node scripts/report-period-totals-monthly.js",
     "prepack:prepare-dist": "echo 'commented out: yarn prepare-dist'",
     "test": "hardhat test",
+    "test:perimeter": "hardhat test tests-perimeter/*.test.js",
+    "test:all": "hardhat test && hardhat test tests-perimeter/*.test.js",
     "coverage": "hardhat coverage",
     "coveralls": "cat coverage/lcov.info | coveralls",
     "hh:fork-testnet": "yarn hardhat node --fork https://testnet.sovryn.app/rpc --no-deploy",
@@ -52,8 +54,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@openzeppelin/contracts": "^3.3.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.4",
+    "@openzeppelin/contracts": "^3.3.0",
     "cross-env": "^7.0.3",
     "decimal.js": "^10.2.0",
     "eth-mutants": "^0.1.1",
@@ -97,6 +99,8 @@
     "hardhat-deploy": "^0.11.37",
     "hardhat-deploy-ethers": "^0.4.1",
     "hardhat-gas-reporter": "^1.0.9",
+    "husky": "^4.3.8",
+    "lint-staged": "^13.2.0",
     "node-logs": "^1.1.0",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.8.4",
@@ -108,5 +112,19 @@
     "typechain": "^8.3.1",
     "typescript": "^4.9.5",
     "web3": "^1.3.4"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "yarn lint"
+    }
+  },
+  "lint-staged": {
+    "*.sol": [
+      "prettier --write"
+    ],
+    "*.{js,ts,json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }

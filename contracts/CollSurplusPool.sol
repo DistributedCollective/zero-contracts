@@ -75,6 +75,48 @@ contract CollSurplusPool is CollSurplusPoolStorage, CheckContract, ICollSurplusP
         require(success, "CollSurplusPool: sending ETH failed");
     }
 
+    /// @dev Gas forwarded to the fee receiver's receive hook. Ample for a receiver
+    ///      that only accepts the transfer and logs, while guaranteeing a
+    ///      gas-sinking receiver can never starve the claimant leg: a receiver
+    ///      needing more gas makes the fee leg fail, which is fail-open — the
+    ///      claimant then receives the full balance.
+    uint256 private constant FEE_LEG_GAS_CAP = 100_000;
+
+    /// @notice Two-leg claim: `_feeAmount` to `_feeReceiver`, remainder to `_account`.
+    ///         Only callable by BorrowerOperations (the Perimeter surplus-claim hook);
+    ///         `claimColl` remains the untouched non-charging path.
+    ///         CEI: all effects (balance zeroing, ETH accounting) precede both external
+    ///         calls, so a reentrant claim sees balances == 0 and reverts. The single
+    ///         `ETH` decrement equals fee + net exactly. The fee leg is fail-open —
+    ///         if it fails, the claimant receives the full balance; the user leg stays
+    ///         fail-closed like `claimColl`.
+    /// @return feePaid true iff the fee transfer succeeded (caller emits the matching event)
+    function claimCollWithFee(
+        address _account,
+        address _feeReceiver,
+        uint256 _feeAmount
+    ) external override returns (bool feePaid) {
+        _requireCallerIsBorrowerOperations();
+        uint256 claimableColl = balances[_account];
+        require(claimableColl > 0, "CollSurplusPool: No collateral available to claim");
+        require(_feeAmount <= claimableColl, "CollSurplusPool: fee exceeds claimable");
+
+        balances[_account] = 0;
+        emit CollBalanceUpdated(_account, 0);
+
+        ETH = ETH.sub(claimableColl);
+
+        (feePaid, ) = _feeReceiver.call{ value: _feeAmount, gas: FEE_LEG_GAS_CAP }("");
+        uint256 userAmount = feePaid ? claimableColl.sub(_feeAmount) : claimableColl;
+        if (feePaid) {
+            emit EtherSent(_feeReceiver, _feeAmount);
+        }
+
+        emit EtherSent(_account, userAmount);
+        (bool success, ) = _account.call{ value: userAmount }("");
+        require(success, "CollSurplusPool: sending ETH failed");
+    }
+
     // --- 'require' functions ---
 
     function _requireCallerIsBorrowerOperations() internal view {

@@ -35,6 +35,7 @@ yarn-error.log
 
 # echidna
 /crytic-export
+fuzzTests/corpus/
 
 #typechain
 types/generated/*
