@@ -529,6 +529,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
                 vars.entireSystemColl = vars
                     .entireSystemColl
                     .sub(singleLiquidation.collToSendToSP)
+                    .sub(singleLiquidation.collGasCompensation)
                     .sub(singleLiquidation.collSurplus);
 
                 // Add liquidation values to their respective running totals
@@ -725,9 +726,11 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
                     singleLiquidation.debtToOffset
                 );
                 vars.entireSystemDebt = vars.entireSystemDebt.sub(singleLiquidation.debtToOffset);
-                vars.entireSystemColl = vars.entireSystemColl.sub(
-                    singleLiquidation.collToSendToSP
-                );
+                vars.entireSystemColl = vars
+                    .entireSystemColl
+                    .sub(singleLiquidation.collToSendToSP)
+                    .sub(singleLiquidation.collGasCompensation)
+                    .sub(singleLiquidation.collSurplus);
 
                 // Add liquidation values to their respective running totals
                 totals = _addLiquidationValuesToTotals(totals, singleLiquidation);
