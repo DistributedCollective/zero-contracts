@@ -13,7 +13,8 @@
 // per-target policy:
 //
 //   ZERO_DIFF   — any label/slot/offset/type difference fails (ActivePool,
-//                 CollSurplusPool: hooked but stateless).
+//                 CollSurplusPool: hooked but stateless; TroveManager: upgraded
+//                 for the Recovery-Mode liquidation fix, logic only).
 //   APPEND_ONLY — the baseline prefix must be byte-identical AND every added
 //                 entry must occupy a slot strictly beyond the baseline's last
 //                 slot; reordering, retyping, resizing or inserting fails
@@ -35,7 +36,7 @@
 //   1. git worktree add <tmp> sovryn-perimeter-fee
 //   2. overlay this repo's hardhat.config.ts (storageLayout output) into <tmp>
 //   3. (cd <tmp> && npx hardhat compile --force)
-//   4. extract the normalized layout for the three targets and overwrite
+//   4. extract the normalized layout for the four targets and overwrite
 //      tests-perimeter/baselines/storage-layout.sovryn-perimeter-fee.json (keep _meta).
 
 const assert = require("assert");
@@ -55,6 +56,8 @@ const TARGETS = [
     { fq: "contracts/ActivePool.sol:ActivePool", policy: ZERO_DIFF },
     // Gains claimCollWithFee — functions only, no state.
     { fq: "contracts/CollSurplusPool.sol:CollSurplusPool", policy: ZERO_DIFF },
+    // Upgraded for the Recovery-Mode liquidation fix (W9a): logic only, no state.
+    { fq: "contracts/TroveManager.sol:TroveManager", policy: ZERO_DIFF },
 ];
 
 describe("Perimeter — storage-layout upgrade safety (surplus-claim fee hook + exit-delay reroute)", () => {
