@@ -19,11 +19,15 @@ contract ZUSDTokenCaller {
         ZUSD.burn(_account, _amount);
     }
 
-    function zusdSendToPool(address _sender,  address _poolAddress, uint256 _amount) external {
+    function zusdSendToPool(address _sender, address _poolAddress, uint256 _amount) external {
         ZUSD.sendToPool(_sender, _poolAddress, _amount);
     }
 
-    function zusdReturnFromPool(address _poolAddress, address _receiver, uint256 _amount ) external {
+    function zusdReturnFromPool(
+        address _poolAddress,
+        address _receiver,
+        uint256 _amount
+    ) external {
         ZUSD.returnFromPool(_poolAddress, _receiver, _amount);
     }
 }

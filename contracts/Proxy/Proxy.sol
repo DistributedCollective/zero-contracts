@@ -2,10 +2,11 @@
 pragma solidity 0.6.11;
 
 import "../Dependencies/Ownable.sol";
+
 /**
  * @title Base Proxy contract.
- * 
- * Adapted version of https://github.com/DistributedCollective/Sovryn-smart-contracts/blob/development/contracts/proxy/Proxy.sol 
+ *
+ * Adapted version of https://github.com/DistributedCollective/Sovryn-smart-contracts/blob/development/contracts/proxy/Proxy.sol
  *
  * @notice The proxy performs delegated calls to the contract implementation
  * it is pointing to. This way upgradable contracts are possible on blockchain.

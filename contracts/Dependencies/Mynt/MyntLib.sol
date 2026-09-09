@@ -94,13 +94,14 @@ library MyntLib {
      * @param _to ultimate recipient
      * @param _amount amount of transfer
      *
-     * @return SignatureTransferDetails struct object 
+     * @return SignatureTransferDetails struct object
      */
-    function _generateTransferDetails(address _to, uint256 _amount) private view returns (ISignatureTransfer.SignatureTransferDetails memory) {
-        ISignatureTransfer.SignatureTransferDetails memory transferDetails = ISignatureTransfer.SignatureTransferDetails({
-            to: _to,
-            requestedAmount: _amount
-        });
+    function _generateTransferDetails(
+        address _to,
+        uint256 _amount
+    ) private view returns (ISignatureTransfer.SignatureTransferDetails memory) {
+        ISignatureTransfer.SignatureTransferDetails memory transferDetails = ISignatureTransfer
+            .SignatureTransferDetails({ to: _to, requestedAmount: _amount });
 
         return transferDetails;
     }

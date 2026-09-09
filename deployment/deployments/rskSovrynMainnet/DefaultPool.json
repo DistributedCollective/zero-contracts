@@ -2,8 +2,8 @@
     "_format": "hh-sol-artifact-1",
     "contractName": "DefaultPool",
     "sourceName": "contracts/DefaultPool.sol",
-    "address": "0x9b38044A276fED8bC1703bd4a2DA1b17F2c61d16",
-    "implementation": "0x5059A057df377436Fc9b68369b696A23cc61Ecc3",
+    "address": "0xcdbA14ca707B99afb8CA93E178aD614Db422a030",
+    "implementation": "0x12BaF6f8151bd26f22E4AE1Df3cef6746840da93",
     "abi": [
         {
             "anonymous": false,

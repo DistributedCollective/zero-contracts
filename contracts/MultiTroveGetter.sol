@@ -18,19 +18,18 @@ contract MultiTroveGetter is MultiTroveGetterStorage {
         uint256 snapshotZUSDDebt;
     }
 
-    function setAddresses(TroveManager _troveManager, ISortedTroves _sortedTroves)
-        public
-        onlyOwner
-    {
+    function setAddresses(
+        TroveManager _troveManager,
+        ISortedTroves _sortedTroves
+    ) public onlyOwner {
         troveManager = _troveManager;
         sortedTroves = _sortedTroves;
     }
 
-    function getMultipleSortedTroves(int256 _startIdx, uint256 _count)
-        external
-        view
-        returns (CombinedTroveData[] memory _troves)
-    {
+    function getMultipleSortedTroves(
+        int256 _startIdx,
+        uint256 _count
+    ) external view returns (CombinedTroveData[] memory _troves) {
         uint256 startIdx;
         bool descend;
 
@@ -61,11 +60,10 @@ contract MultiTroveGetter is MultiTroveGetterStorage {
         }
     }
 
-    function _getMultipleSortedTrovesFromHead(uint256 _startIdx, uint256 _count)
-        internal
-        view
-        returns (CombinedTroveData[] memory _troves)
-    {
+    function _getMultipleSortedTrovesFromHead(
+        uint256 _startIdx,
+        uint256 _count
+    ) internal view returns (CombinedTroveData[] memory _troves) {
         address currentTroveowner = sortedTroves.getFirst();
 
         for (uint256 idx = 0; idx < _startIdx; ++idx) {
@@ -92,11 +90,10 @@ contract MultiTroveGetter is MultiTroveGetterStorage {
         }
     }
 
-    function _getMultipleSortedTrovesFromTail(uint256 _startIdx, uint256 _count)
-        internal
-        view
-        returns (CombinedTroveData[] memory _troves)
-    {
+    function _getMultipleSortedTrovesFromTail(
+        uint256 _startIdx,
+        uint256 _count
+    ) internal view returns (CombinedTroveData[] memory _troves) {
         address currentTroveowner = sortedTroves.getLast();
 
         for (uint256 idx = 0; idx < _startIdx; ++idx) {

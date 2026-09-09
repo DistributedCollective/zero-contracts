@@ -7,7 +7,7 @@ pragma solidity 0.6.11;
  *
  * Based on OpenZeppelin's Initializable contract:
  * https://github.com/OpenZeppelin/openzeppelin-upgrades/blob/master/packages/core/contracts/Initializable.sol
- * 
+ *
  * @dev Helper contract to support initializer functions. To use it, replace
  * the constructor with a function that has the `initializer` modifier.
  * WARNING: Unlike constructors, initializer functions must be manually

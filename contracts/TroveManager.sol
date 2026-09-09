@@ -38,7 +38,10 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
     event ZEROStakingAddressChanged(address _zeroStakingAddress);
 
     ///@param _bootstrapPeriod During bootsrap period redemptions are not allowed
-    constructor(uint256 _bootstrapPeriod, address _permit2) public TroveManagerBase(_bootstrapPeriod) {
+    constructor(
+        uint256 _bootstrapPeriod,
+        address _permit2
+    ) public TroveManagerBase(_bootstrapPeriod) {
         permit2 = IPermit2(_permit2);
     }
 
@@ -526,6 +529,7 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
                 vars.entireSystemColl = vars
                     .entireSystemColl
                     .sub(singleLiquidation.collToSendToSP)
+                    .sub(singleLiquidation.collGasCompensation)
                     .sub(singleLiquidation.collSurplus);
 
                 // Add liquidation values to their respective running totals
@@ -722,9 +726,11 @@ contract TroveManager is TroveManagerBase, CheckContract, ITroveManager {
                     singleLiquidation.debtToOffset
                 );
                 vars.entireSystemDebt = vars.entireSystemDebt.sub(singleLiquidation.debtToOffset);
-                vars.entireSystemColl = vars.entireSystemColl.sub(
-                    singleLiquidation.collToSendToSP
-                );
+                vars.entireSystemColl = vars
+                    .entireSystemColl
+                    .sub(singleLiquidation.collToSendToSP)
+                    .sub(singleLiquidation.collGasCompensation)
+                    .sub(singleLiquidation.collSurplus);
 
                 // Add liquidation values to their respective running totals
                 totals = _addLiquidationValuesToTotals(totals, singleLiquidation);

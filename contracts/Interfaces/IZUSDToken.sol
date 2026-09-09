@@ -5,8 +5,7 @@ pragma solidity 0.6.11;
 import "../Dependencies/IERC20.sol";
 import "../Dependencies/IERC2612.sol";
 
-interface IZUSDToken is IERC20, IERC2612 { 
-    
+interface IZUSDToken is IERC20, IERC2612 {
     // --- Events ---
 
     event TroveManagerAddressChanged(address _troveManagerAddress);
@@ -21,7 +20,7 @@ interface IZUSDToken is IERC20, IERC2612 {
 
     function burn(address _account, uint256 _amount) external;
 
-    function sendToPool(address _sender,  address poolAddress, uint256 _amount) external;
+    function sendToPool(address _sender, address poolAddress, uint256 _amount) external;
 
-    function returnFromPool(address poolAddress, address user, uint256 _amount ) external;
+    function returnFromPool(address poolAddress, address user, uint256 _amount) external;
 }
