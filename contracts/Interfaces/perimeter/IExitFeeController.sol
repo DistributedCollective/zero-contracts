@@ -23,7 +23,8 @@ pragma experimental ABIEncoderV2;
 ///         One declaration shared by every consumer so they all resolve the
 ///         same ABI. Products compiled under a pragma this file cannot span
 ///         declare their own ABI-equivalent variant instead.
-///         Zero calls only `quoteExitFee`; the rest is declared for completeness.
+///         Zero's hooks call `quoteExitFee` and `quoteExitDelayFor`; the rest is
+///         declared for completeness.
 /// @dev    `quoteExitDelayFor(address,address,address,bytes32,address) view
 ///         returns (uint32,address,address)` must stay ABI-identical, as
 ///         other perimeter components call it by that exact selector.

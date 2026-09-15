@@ -156,11 +156,11 @@ interface IExitDelayQueue {
     ///      is the caller's responsibility and MUST be preceded by the caller's own
     ///      `require(userAmount <= type(uint128).max)` (`AmountTooLarge`) so a value
     ///      that would silently truncate is rejected UPSTREAM, before any escrow
-    ///      accounting. The queue keeps `AmountTooLarge` as a defensive
-    ///      queue-boundary guard on the narrowing path — it is NOT dead code: it is
-    ///      the last line of defense if a caller ever omits its own check. Keeping
+    ///      accounting. The queue itself CANNOT re-assert this on an
+    ///      already-`uint128` argument — the `AmountTooLarge` error is declared for
+    ///      that CALLER-side hook boundary, not re-checked here. Keeping
     ///      the ABI at `uint128` also packs `amount` into `ExitRequest` word 1
-    /// — widening would cost a whole extra storage word per request.
+    ///       — widening would cost a whole extra storage word per request.
 
     function recordERC20Exit(
         address token,
