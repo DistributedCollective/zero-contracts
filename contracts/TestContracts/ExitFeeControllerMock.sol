@@ -32,11 +32,6 @@ contract ExitFeeControllerMock {
     bool public perimeterEnabled; // maps to securityPerimeterEnabled
     uint32 public delaySeconds; // returned as `d` when the perimeter charges a delay
     bool public delayRevert; // when true, quoteExitDelayFor reverts → exercises the hook's FAIL-CLOSED leg
-    // Optional passthrough override so a test can force effOrig/effOwner != raw
-    // (Zero has no passthrough in production, but the fail-closed identity
-    // threading is still asserted).
-    bool public overridePassthrough;
-    address public forcedEffActor;
 
     function configure(
         bool _active,
@@ -78,14 +73,9 @@ contract ExitFeeControllerMock {
         delayRevert = _v;
     }
 
-    function setForcedPassthrough(bool _on, address _effActor) external {
-        overridePassthrough = _on;
-        forcedEffActor = _effActor;
-    }
-
     /// @dev Single hook entry. Short-circuits the kill switch FIRST:
     ///      a disabled perimeter returns (0, raw, owner) — pay direct. Otherwise
-    ///      returns the configured delay and (optionally forced) effective actors.
+    ///      returns the configured delay and the unchanged originator and owner.
     function quoteExitDelayFor(
         address rawOriginator,
         address owner,
@@ -96,9 +86,6 @@ contract ExitFeeControllerMock {
         require(!delayRevert, "EFCMock: forced delay revert");
         if (!perimeterEnabled) {
             return (0, rawOriginator, owner);
-        }
-        if (overridePassthrough) {
-            return (delaySeconds, forcedEffActor, forcedEffActor);
         }
         return (delaySeconds, rawOriginator, owner);
     }

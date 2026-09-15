@@ -109,11 +109,6 @@ interface IExitFeeController {
         bool active,
         bool bypass
     );
-    event PassthroughActorSet(
-        bytes32 indexed surfaceId,
-        address indexed actor,
-        bool isPassthrough
-    );
 
     // ─── Quote ────────────────────────────────────────────────────────────
 
@@ -134,13 +129,13 @@ interface IExitFeeController {
     /// @notice The hook's SINGLE delay entry. Short-circuits the kill
     ///         switch FIRST: `if (!securityPerimeterEnabled) return (0,
     ///         rawOriginator, owner)` (pays direct without touching the queue).
-    ///         Otherwise resolves the surface-scoped effective actors, quotes on
-    ///         `effOrig`, and returns all three — so the quote and the record use
-    ///         the SAME identity. The hook MUST ignore `effOrig` /
-    ///         `effOwner` and pay direct whenever `d == 0`.
+    ///         Otherwise quotes the withdrawal delay on the originator and
+    ///         returns the originator and owner unchanged, so the quote and
+    ///         the record share the same identity. The hook MUST ignore
+    ///         `effOrig` / `effOwner` and pay direct whenever `d == 0`.
     /// @return d        Delay seconds to escrow for (0 ⇒ off / inactive / bypassed).
-    /// @return effOrig  Effective originator (raw, or passthrough→receiver).
-    /// @return effOwner Effective owner (raw, or passthrough→receiver).
+    /// @return effOrig  The originator, unchanged.
+    /// @return effOwner The owner, unchanged.
     function quoteExitDelayFor(
         address rawOriginator,
         address owner,
@@ -156,14 +151,6 @@ interface IExitFeeController {
         address subProduct,
         address effectiveActor
     ) external view returns (uint32);
-
-    /// @notice Resolve a surface-scoped passthrough: a passthrough registered for
-    ///         `surfaceId` resolves `raw` to `receiver`, else identity.
-    function effectiveActor(
-        bytes32 surfaceId,
-        address raw,
-        address receiver
-    ) external view returns (address);
 
     // ─── State views ──────────────────────────────────────────────────────
 
@@ -204,8 +191,6 @@ interface IExitFeeController {
         bytes32 surfaceId,
         address actor
     ) external view returns (DelayBypassPolicy memory);
-
-    function passthroughActor(bytes32 surfaceId, address a) external view returns (bool);
 
     // ─── Admin ────────────────────────────────────────────────────────────
 
@@ -264,6 +249,4 @@ interface IExitFeeController {
         address actor,
         DelayBypassPolicy calldata policy
     ) external;
-
-    function setPassthroughActor(bytes32 surfaceId, address a, bool isPassthrough) external;
 }
