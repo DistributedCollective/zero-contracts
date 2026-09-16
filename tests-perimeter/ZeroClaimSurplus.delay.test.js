@@ -30,6 +30,7 @@ const TroveManagerTester = artifacts.require("TroveManagerTester");
 const MassetManagerTester = artifacts.require("MassetManagerTester");
 const ExitFeeControllerMock = artifacts.require("ExitFeeControllerMock");
 const MockExitDelayQueue = artifacts.require("MockExitDelayQueue");
+const NonPayable = artifacts.require("NonPayable");
 
 const th = testHelpers.TestHelper;
 const dec = th.dec;
@@ -199,6 +200,47 @@ contract("Perimeter delay — Zero surplus claim reroute", async (accounts) => {
             "escrowed + fee != gross"
         );
         assert.isDefined(getEvent(tx, "ExitFeeApplied"), "charging path must emit ExitFeeApplied");
+    });
+
+    it("fee-vault reverts (d>0): GROSS escrowed behind the delay (cannot bypass), ExitFeeSkipped(VAULT_REVERT)", async () => {
+        await wireQueue();
+        const gross = await setupSurplus(alice);
+        const badReceiver = await NonPayable.new(); // receive() reverts while isPayable=false
+        await controller.configure(true, 50, badReceiver.address, NONE);
+
+        const aliceBefore = toBN(await web3.eth.getBalance(alice));
+        const tx = await borrowerOperations.claimCollateral({ from: alice, gasPrice: GAS_PRICE });
+        const gasCost = GAS_PRICE.mul(toBN(tx.receipt.gasUsed));
+
+        // fee leg bounced ⇒ full GROSS routed to the queue (NOT paid direct, NOT skimmed).
+        assert.isTrue(
+            toBN(await web3.eth.getBalance(alice)).eq(aliceBefore.sub(gasCost)),
+            "claimant was paid directly despite the hold"
+        );
+        assert.isTrue(
+            (await collSurplusPool.getCollateral(alice)).eq(toBN(0)),
+            "claimable not zeroed"
+        );
+        assert.isTrue(
+            toBN(await web3.eth.getBalance(badReceiver.address)).eq(toBN(0)),
+            "bad receiver got RBTC"
+        );
+        assert.isTrue((await queue.totalEscrowed(ZERO_ADDRESS)).eq(gross), "escrowed != gross");
+
+        const applied = getEvent(tx, "ExitFeeApplied");
+        assert.isUndefined(applied, "ExitFeeApplied emitted on a bounced fee leg");
+        const skipped = getEvent(tx, "ExitFeeSkipped");
+        assert.isDefined(skipped, "ExitFeeSkipped not emitted");
+        assert.equal(toBN(skipped.args.reason).toNumber(), 5); // VAULT_REVERT
+
+        // the amount the queue recorded must equal what the pool actually sent it
+        // (the gross), never the controller's quoted net.
+        const request = await queue.getRequest(1);
+        assert.isTrue(
+            toBN(request.amount).eq(gross),
+            "escrowed request amount != gross sent by the pool"
+        );
+        assert.equal(request.receiver, alice, "receiver must be the claimant");
     });
 
     it("perimeter disabled (d==0): the untouched claim, queue NEVER touched", async () => {
