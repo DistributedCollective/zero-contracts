@@ -187,7 +187,7 @@ contract ZEROStaking is ZEROStakingStorage, IZEROStaking, CheckContract, BaseMat
 
     function _sendETHGainToUser(uint256 ETHGain) internal {
         emit EtherSent(msg.sender, ETHGain);
-        (bool success, ) = msg.sender.call{value: ETHGain}("");
+        (bool success, ) = msg.sender.call{ value: ETHGain }("");
         require(success, "ZEROStaking: Failed to send accumulated ETHGain");
     }
 

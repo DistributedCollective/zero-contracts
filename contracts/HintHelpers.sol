@@ -136,15 +136,7 @@ contract HintHelpers is LiquityBase, HintHelpersStorage, CheckContract {
         uint256 _CR,
         uint256 _numTrials,
         uint256 _inputRandomSeed
-    )
-        external
-        view
-        returns (
-            address hintAddress,
-            uint256 diff,
-            uint256 latestRandomSeed
-        )
-    {
+    ) external view returns (address hintAddress, uint256 diff, uint256 latestRandomSeed) {
         uint256 arrayLength = troveManager.getTroveOwnersCount();
 
         if (arrayLength == 0) {

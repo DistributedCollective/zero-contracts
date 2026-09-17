@@ -163,6 +163,40 @@ contract("Perimeter — Zero borrower collateral exit (closeTrove)", async (acco
         assert.equal((await troveManager.Troves(alice))[3].toString(), baseStatus);
     });
 
+    it("closeTrove (active but feeReceiver == 0): fee demoted, full coll to borrower, nothing burned", async () => {
+        // A value call to a no-code address succeeds, so charging into
+        // address(0) would burn the fee. The coll path must demote the same way
+        // the surplus-claim path does, rather than send RBTC to 0x0.
+        await setupCloseable();
+        await borrowerOperations.setExitFeeController(controller.address, { from: owner });
+        await controller.configure(true, 50, ZERO_ADDRESS, NONE); // active, 50bps, receiver 0
+
+        const gross = await getTroveEntireColl(alice);
+        const apEthBefore = await activePool.getETH();
+        const zeroBalBefore = toBN(await web3.eth.getBalance(ZERO_ADDRESS));
+        const aliceBefore = toBN(await web3.eth.getBalance(alice));
+
+        const tx = await borrowerOperations.closeTrove({ from: alice, gasPrice: GAS_PRICE });
+        const gasCost = GAS_PRICE.mul(toBN(tx.receipt.gasUsed));
+
+        assert.isTrue(
+            (await activePool.getETH()).eq(apEthBefore.sub(gross)),
+            "ActivePool != -coll"
+        );
+        assert.isTrue(
+            toBN(await web3.eth.getBalance(ZERO_ADDRESS)).eq(zeroBalBefore),
+            "fee was burned to 0x0"
+        );
+        assert.isTrue(
+            toBN(await web3.eth.getBalance(alice)).eq(aliceBefore.add(gross).sub(gasCost)),
+            "borrower != +gross (fee demoted, minus gas)"
+        );
+        const ev = getEvent(tx, "ExitFeeSkipped");
+        assert.isDefined(ev, "ExitFeeSkipped not emitted");
+        assert.equal(toBN(ev.args.reason).toNumber(), 2, "reason != DISABLED");
+        assert.isUndefined(getEvent(tx, "ExitFeeApplied"));
+    });
+
     it("closeTrove: controller unset → full coll to borrower, ExitFeeSkipped(CONTROLLER_REVERT)", async () => {
         await setupCloseable();
         const gross = await getTroveEntireColl(alice);

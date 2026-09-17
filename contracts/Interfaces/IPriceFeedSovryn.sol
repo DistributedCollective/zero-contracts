@@ -13,15 +13,15 @@ pragma solidity 0.6.11;
  * drawdown, margin and collateral.
  * */
 interface IPriceFeedSovryn {
-    function queryRate(address sourceToken, address destToken)
-        external
-        view
-        returns (uint256 rate, uint256 precision);
+    function queryRate(
+        address sourceToken,
+        address destToken
+    ) external view returns (uint256 rate, uint256 precision);
 
-    function queryPrecision(address sourceToken, address destToken)
-        external
-        view
-        returns (uint256 precision);
+    function queryPrecision(
+        address sourceToken,
+        address destToken
+    ) external view returns (uint256 precision);
 
     function queryReturn(
         address sourceToken,

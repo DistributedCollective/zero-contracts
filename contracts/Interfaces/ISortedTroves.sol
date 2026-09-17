@@ -33,12 +33,7 @@ interface ISortedTroves {
      * @param _prevId Id of previous node for the insert position
      * @param _nextId Id of next node for the insert position
      */
-    function insert(
-        address _id,
-        uint256 _ICR,
-        address _prevId,
-        address _nextId
-    ) external;
+    function insert(address _id, uint256 _ICR, address _prevId, address _nextId) external;
 
     /**
      * @dev Remove a node from the list
@@ -53,12 +48,7 @@ interface ISortedTroves {
      * @param _prevId Id of previous node for the new insert position
      * @param _nextId Id of next node for the new insert position
      */
-    function reInsert(
-        address _id,
-        uint256 _newICR,
-        address _prevId,
-        address _nextId
-    ) external;
+    function reInsert(address _id, uint256 _newICR, address _prevId, address _nextId) external;
 
     /**
      * @dev Checks if the list contains a node

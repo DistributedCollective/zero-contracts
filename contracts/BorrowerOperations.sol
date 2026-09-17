@@ -17,6 +17,8 @@ import "./BorrowerOperationsStorage.sol";
 import "./Dependencies/Mynt/MyntLib.sol";
 import "./Interfaces/IPermit2.sol";
 import "./Interfaces/perimeter/IExitFeeController.sol";
+import "./Interfaces/perimeter/IExitDelayQueueHook.sol";
+import "./Dependencies/BorrowerOperationsPerimeterOps.sol";
 
 contract BorrowerOperations is
     LiquityBase,
@@ -37,7 +39,18 @@ contract BorrowerOperations is
     bytes32 private constant PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS =
         keccak256("PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS");
 
+    // --- Security-perimeter exit-delay hook ---
+    // The delay queue pointer also lives in an EIP-1967-style unstructured
+    // slot, so `BorrowerOperations` storage-layout is unchanged (zero-diff). It is
+    // rotated with `setExitDelayQueue` under the SAME owner as the controller
+    // pointer. Because the pointer redirects ESCROW it is more sensitive than the
+    // controller pointer — rotation is an Owner/SIP action.
+    bytes32 private constant EXIT_DELAY_QUEUE_SLOT =
+        bytes32(uint256(keccak256("sovryn.perimeterExitDelayQueue")) - 1);
+
     event ExitFeeControllerSet(address indexed previous, address indexed current);
+    event ExitDelayQueueSet(address indexed previous, address indexed current);
+    event PerimeterOpsSet(address indexed previous, address indexed current);
     event ExitFeeApplied(
         bytes32 indexed surfaceId,
         address indexed actor,
@@ -817,78 +830,26 @@ contract BorrowerOperations is
     }
 
     /**
-     * Claim remaining collateral from a redemption or from a liquidation with ICR > MCR in Recovery Mode,
-     * charging the Perimeter exit fee when the PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS policy is active.
-     * Fail-open like every Perimeter hook: on any Perimeter failure (controller missing/
-     * reverting, invalid quote, fee-leg transfer failure inside the pool) the claimant
-     * receives the full surplus — a Perimeter failure can never brick a claim. The
-     * non-charging path is the untouched claimColl flow (plus the ExitFeeSkipped
-     * event, same convention as _sendCollWithExitFee).
+     * Claim remaining collateral from a redemption or from a liquidation with ICR > MCR in
+     * Recovery Mode, settled through the security perimeter: the exit fee leg when the
+     * PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS policy is active, then the delay leg.
+     *
+     * The FEE leg is fail-open, as every Perimeter fee hook is: a missing or reverting
+     * controller, an invalid quote or a failed fee transfer leaves the claimant with the
+     * full surplus. The DELAY leg is fail-CLOSED: once the perimeter resolves a hold the
+     * net must escrow, so an unwired or reverting queue reverts the claim and the claimant
+     * keeps their surplus balance to claim again later.
+     *
+     * With no fee and no delay this is the untouched claimColl flow, plus the
+     * ExitFeeSkipped event.
      */
     function claimCollateral() external override {
-        uint256 gross = collSurplusPool.getCollateral(msg.sender);
-        // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
-        IExitFeeController.ExitFeeQuote memory q = _safeQuote(
-            PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
-            address(0),
-            msg.sender,
-            gross
+        _delegateToPerimeterOps(
+            abi.encodeWithSelector(
+                BorrowerOperationsPerimeterOps(address(0)).claimSurplusWithPerimeter.selector,
+                collSurplusPool
+            )
         );
-
-        // Defensive: a quote that charges into address(0) would burn the fee (a
-        // value call to a no-code address succeeds). Demote to the non-charging
-        // path — DISABLED is the enum's "feeReceiver == address(0)" reason.
-        if (q.active && q.feeAmount > 0 && q.feeReceiver == address(0)) {
-            q.active = false;
-            q.netAmount = gross;
-            q.reason = uint8(IExitFeeController.SkipReason.DISABLED);
-        }
-
-        if (q.active && q.feeAmount > 0) {
-            // Two-leg split inside the pool (fee → feeReceiver, net → claimant);
-            // the pool's fee leg is fail-open and reports which event is truthful.
-            bool feePaid = collSurplusPool.claimCollWithFee(
-                msg.sender,
-                q.feeReceiver,
-                q.feeAmount
-            );
-            if (feePaid) {
-                emit ExitFeeApplied(
-                    PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
-                    msg.sender,
-                    address(0),
-                    address(0),
-                    msg.sender,
-                    gross,
-                    q.feeAmount,
-                    q.netAmount,
-                    q.feeReceiver
-                );
-            } else {
-                emit ExitFeeSkipped(
-                    PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
-                    msg.sender,
-                    address(0),
-                    gross,
-                    q.rateBps,
-                    uint8(IExitFeeController.SkipReason.VAULT_REVERT)
-                );
-            }
-        } else {
-            // !active (INACTIVE / DISABLED / INVALID_QUOTE / CONTROLLER_REVERT)
-            // OR active-but-zero-fee (dust / zero-rate / gross == 0 → reason NONE).
-            emit ExitFeeSkipped(
-                PERIMETER_SURFACE_ZERO_CLAIM_SURPLUS,
-                msg.sender,
-                address(0),
-                gross,
-                q.rateBps,
-                q.reason
-            );
-            // send ETH from CollSurplus Pool to owner — untouched original path
-            // (gross == 0 falls through to claimColl's own revert, identical to today)
-            collSurplusPool.claimColl(msg.sender);
-        }
     }
 
     // --- Helper functions ---
@@ -1004,6 +965,39 @@ contract BorrowerOperations is
         emit ExitFeeControllerSet(prev, ctrl);
     }
 
+    /// @notice Address of the ExitDelayQueue this instance escrows delayed
+    ///         collateral exits into. Held in an EIP-1967-style unstructured slot
+    ///         (no regular-storage footprint). address(0) until governance pins
+    ///         one ⇒ the security-perimeter reroute is unwired ⇒ exits pay direct
+    ///         at `d == 0` and fail CLOSED at `d > 0` (a delay is never silently
+    ///         bypassed by a missing pointer).
+    function exitDelayQueue() public view returns (address queue) {
+        bytes32 slot = EXIT_DELAY_QUEUE_SLOT;
+        assembly {
+            queue := sload(slot)
+        }
+    }
+
+    /// @notice Pin/rotate the ExitDelayQueue pointer. `onlyOwner` — the same
+    ///         BorrowerOperations proxy owner (= TimelockOwner on mainnet) that
+    ///         gates `setExitFeeController`. Because the pointer redirects ESCROW
+    ///         it is MORE sensitive than the controller pointer; rotation is an
+    ///         Owner/SIP action. Reverts on a non-contract so a typo cannot point
+    ///         the reroute at a no-code address (address(0) is likewise rejected —
+    ///         unwiring, if ever needed, is a deliberate distinct governance path,
+    ///         and the perimeter is instead disabled via the controller kill
+    ///         switch, which quotes `d == 0` and pays direct).
+    function setExitDelayQueue(address queue) external onlyOwner {
+        require(queue != address(0), "EDQ:zero");
+        checkContract(queue);
+        address prev = exitDelayQueue();
+        bytes32 slot = EXIT_DELAY_QUEUE_SLOT;
+        assembly {
+            sstore(slot, queue)
+        }
+        emit ExitDelayQueueSet(prev, queue);
+    }
+
     /// @dev Fail-open quote wrapper. On a missing/reverting controller or a
     ///      semantically invalid quote, returns a non-charging quote with
     ///      `netAmount == gross`. The validity gate uses subtraction only
@@ -1057,76 +1051,55 @@ contract BorrowerOperations is
         }
     }
 
-    /// @dev Settle a borrower collateral payout, charging the Perimeter exit fee
-    ///      when the resolved policy is active. The fee leg uses `try/catch`
-    ///      (0.6.11 native) so a fee-receiver failure never bricks the exit; on
-    ///      any non-charging path the full `gross` is sent to the borrower via
-    ///      the existing fail-closed `sendETH`. ActivePool's recorded ETH
-    ///      decrements by exactly `gross` either way (the reverted fee-leg
-    ///      subcall rolls back its `ETH.sub`).
+    /// @dev Settle a borrower collateral payout through the security perimeter:
+    ///      the fee leg, then the delay leg. The body runs in
+    ///      `BorrowerOperationsPerimeterOps` under `delegatecall`, so it settles
+    ///      in this proxy's context and the same transaction, and its events
+    ///      carry this address.
+    ///
+    ///      Any failure propagates unchanged. Once the perimeter resolves a
+    ///      delay the leg must escrow, so a reverting hook reverts the whole
+    ///      close or adjust rather than paying direct.
     function _sendCollWithExitFee(
         IActivePool _activePool,
         address borrower,
         uint256 gross
     ) private {
-        // Debt-only adjustments (repay / debt-decrease) reach here with gross == 0:
-        // no collateral leaves the pool, so there is nothing to settle. Skip the
-        // controller round-trip and the Perimeter event. (Baseline called
-        // sendETH(borrower, 0) here — a value-less no-op that only emitted
-        // EtherSent(_, 0) / ActivePoolETHBalanceUpdated; we drop that redundant
-        // transfer, so debt-only ops emit fewer events than pre-Perimeter.)
-        if (gross == 0) {
-            return;
-        }
-
-        // Single Zero deployment: subProduct = address(0). Asset is native RBTC.
-        IExitFeeController.ExitFeeQuote memory q = _safeQuote(
-            PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
-            address(0),
-            borrower,
-            gross
-        );
-
-        if (q.active && q.feeAmount > 0) {
-            try _activePool.sendETH(q.feeReceiver, q.feeAmount) {
-                _activePool.sendETH(borrower, q.netAmount); // user leg: existing fail-closed behavior
-                // Emit only after BOTH legs settle, so an ExitFeeApplied event always
-                // implies a completed borrower payout (truthful by construction).
-                emit ExitFeeApplied(
-                    PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
-                    borrower,
-                    address(0),
-                    address(0),
-                    borrower,
-                    gross,
-                    q.feeAmount,
-                    q.netAmount,
-                    q.feeReceiver
-                );
-                return;
-            } catch {
-                emit ExitFeeSkipped(
-                    PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
-                    borrower,
-                    address(0),
-                    gross,
-                    q.rateBps,
-                    uint8(IExitFeeController.SkipReason.VAULT_REVERT)
-                );
-            }
-        } else {
-            // !active (INACTIVE / DISABLED / INVALID_QUOTE / CONTROLLER_REVERT)
-            // OR active-but-zero-fee (dust / zero-rate policy → q.reason == NONE).
-            emit ExitFeeSkipped(
-                PERIMETER_SURFACE_ZERO_WITHDRAW_COLL,
+        _delegateToPerimeterOps(
+            abi.encodeWithSelector(
+                BorrowerOperationsPerimeterOps(address(0)).sendCollWithExitFee.selector,
+                _activePool,
                 borrower,
-                address(0),
-                gross,
-                q.rateBps,
-                q.reason
-            );
+                gross
+            )
+        );
+    }
+
+    /// @dev Run one perimeter settlement in this proxy's context and transaction.
+    ///      Any failure propagates unchanged, so a reverting settlement reverts
+    ///      the whole close, adjust or claim rather than paying direct.
+    ///
+    ///      `checkContract` is what makes that true: a `delegatecall` to a
+    ///      code-less address SUCCEEDS with empty returndata, so an unset hook
+    ///      would otherwise skip the fee and the delay in silence.
+    function _delegateToPerimeterOps(bytes memory payload) private {
+        address ops = perimeterOps;
+        checkContract(ops);
+        (bool ok, bytes memory ret) = ops.delegatecall(payload);
+        if (!ok) {
+            assembly {
+                revert(add(ret, 0x20), mload(ret))
+            }
         }
-        _activePool.sendETH(borrower, gross); // full-gross fallback (any non-charging path)
+    }
+
+    /// @notice Rotate the perimeter settlement hook. `onlyOwner`, mirroring
+    ///         `setTroveManagerRedeemOps`.
+    function setPerimeterOps(address _perimeterOps) external onlyOwner {
+        checkContract(_perimeterOps);
+        address previous = perimeterOps;
+        perimeterOps = _perimeterOps;
+        emit PerimeterOpsSet(previous, _perimeterOps);
     }
 
     /// @notice Read-only preview of the Perimeter exit fee on a Zero borrower collateral

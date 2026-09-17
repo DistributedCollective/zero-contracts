@@ -7,7 +7,7 @@ import "./Proxy.sol";
  * @title Upgradable Proxy contract.
  *
  * Adapted version of https://github.com/DistributedCollective/Sovryn-smart-contracts/blob/development/contracts/proxy/UpgradableProxy.sol
- * 
+ *
  * @notice A disadvantage of the immutable ledger is that nobody can change the
  * source code of a smart contract after it’s been deployed. In order to fix
  * bugs or introduce new features, smart contracts need to be upgradable somehow.
@@ -32,5 +32,4 @@ contract UpgradableProxy is Proxy {
     function setImplementation(address _implementation) public onlyOwner {
         _setImplementation(_implementation);
     }
-
 }

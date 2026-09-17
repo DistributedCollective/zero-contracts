@@ -10,11 +10,12 @@ import "../Interfaces/perimeter/IExitFeeController.sol";
 ///         cannot be compiled into the 0.6.11 zero-contracts workspace, so the
 ///         hooks are exercised against this configurable stand-in.
 ///
-///         Only `quoteExitFee` is implemented (the single selector the product
-///         hook calls). It deliberately does NOT inherit `IExitFeeController` so
-///         we avoid stubbing the full admin/view surface; the selector + ABI of
-///         `quoteExitFee` match, which is all `IExitFeeController(ctrl).quoteExitFee`
-///         needs at the call site.
+///         Only `quoteExitFee` and `quoteExitDelayFor` are implemented (the two
+///         selectors the product hooks call). It deliberately does NOT inherit
+///         `IExitFeeController` so we avoid stubbing the full admin/view
+///         surface; the selector + ABI of each match what
+///         `IExitFeeController(ctrl).quoteExitFee` /
+///         `.quoteExitDelayFor` need at the call site.
 contract ExitFeeControllerMock {
     bool public doRevert; // when true, quoteExitFee reverts → exercises CONTROLLER_REVERT fail-open
     bool public activeFlag;
@@ -27,6 +28,11 @@ contract ExitFeeControllerMock {
     bool public overrideAmounts;
     uint256 public forcedFeeAmount;
     uint256 public forcedNetAmount;
+
+    // --- Delay (security-perimeter) knobs ---
+    bool public perimeterEnabled; // maps to securityPerimeterEnabled
+    uint32 public delaySeconds; // returned as `d` when the perimeter charges a delay
+    bool public delayRevert; // when true, quoteExitDelayFor reverts → exercises the hook's FAIL-CLOSED leg
 
     function configure(
         bool _active,
@@ -55,6 +61,34 @@ contract ExitFeeControllerMock {
         overrideAmounts = _on;
         forcedFeeAmount = _fee;
         forcedNetAmount = _net;
+    }
+
+    // --- Delay configuration ---
+
+    function configureDelay(bool _enabled, uint32 _delaySeconds) external {
+        perimeterEnabled = _enabled;
+        delaySeconds = _delaySeconds;
+    }
+
+    function setDelayRevert(bool _v) external {
+        delayRevert = _v;
+    }
+
+    /// @dev Single hook entry. Short-circuits the kill switch FIRST:
+    ///      a disabled perimeter returns (0, raw, owner) — pay direct. Otherwise
+    ///      returns the configured delay and the unchanged originator and owner.
+    function quoteExitDelayFor(
+        address rawOriginator,
+        address owner,
+        address /* receiver */,
+        bytes32 /* surfaceId */,
+        address /* subProduct */
+    ) external view returns (uint32 d, address effOrig, address effOwner) {
+        require(!delayRevert, "EFCMock: forced delay revert");
+        if (!perimeterEnabled) {
+            return (0, rawOriginator, owner);
+        }
+        return (delaySeconds, rawOriginator, owner);
     }
 
     function quoteExitFee(

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {IERC1271} from "../interfaces/IERC1271.sol";
+import { IERC1271 } from "../interfaces/IERC1271.sol";
 
 library SignatureVerification {
     /// @notice Thrown when the passed in signature is not a valid length
@@ -16,7 +16,9 @@ library SignatureVerification {
     /// @notice Thrown when the recovered contract signature is incorrect
     error InvalidContractSignature();
 
-    bytes32 constant UPPER_BIT_MASK = (0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    bytes32 constant UPPER_BIT_MASK = (
+        0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    );
 
     function verify(bytes calldata signature, bytes32 hash, address claimedSigner) internal view {
         bytes32 r;
@@ -41,7 +43,8 @@ library SignatureVerification {
             if (signer != claimedSigner) revert InvalidSigner();
         } else {
             bytes4 magicValue = IERC1271(claimedSigner).isValidSignature(hash, signature);
-            if (magicValue != IERC1271.isValidSignature.selector) revert InvalidContractSignature();
+            if (magicValue != IERC1271.isValidSignature.selector)
+                revert InvalidContractSignature();
         }
     }
 }

@@ -24,10 +24,10 @@ contract DefaultPool is DefaultPoolStorage, CheckContract, IDefaultPool {
 
     // --- Dependency setters ---
 
-    function setAddresses(address _troveManagerAddress, address _activePoolAddress)
-        external
-        onlyOwner
-    {
+    function setAddresses(
+        address _troveManagerAddress,
+        address _activePoolAddress
+    ) external onlyOwner {
         checkContract(_troveManagerAddress);
         checkContract(_activePoolAddress);
 

@@ -1,14 +1,13 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.11;
 
 import "../Proxy/UpgradableProxy.sol";
+
 contract Storage {
     uint someVar;
 }
 
 contract ProxiableContract is Storage {
-
     function getSomeVar() public view returns (uint) {
         return someVar;
     }
@@ -23,7 +22,6 @@ contract Storage2 {
 }
 
 contract ProxiableContract2 is ProxiableContract, Storage2 {
-
     function getAnotherVar() public view returns (uint) {
         return anotherVar;
     }

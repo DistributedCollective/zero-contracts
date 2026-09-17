@@ -2,7 +2,7 @@
 pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
-import {IEIP712} from "./IEIP712.sol";
+import { IEIP712 } from "./IEIP712.sol";
 
 /// @title AllowanceTransfer
 /// @notice Handles ERC20 token permissions through signature based allowance setting and ERC20 token transfers by checking allowed amounts
@@ -10,12 +10,20 @@ import {IEIP712} from "./IEIP712.sol";
 interface IAllowanceTransfer is IEIP712 {
     /// @notice Emits an event when the owner successfully invalidates an ordered nonce.
     event NonceInvalidation(
-        address indexed owner, address indexed token, address indexed spender, uint48 newNonce, uint48 oldNonce
+        address indexed owner,
+        address indexed token,
+        address indexed spender,
+        uint48 newNonce,
+        uint48 oldNonce
     );
 
     /// @notice Emits an event when the owner successfully sets permissions on a token for the spender.
     event Approval(
-        address indexed owner, address indexed token, address indexed spender, uint160 amount, uint48 expiration
+        address indexed owner,
+        address indexed token,
+        address indexed spender,
+        uint160 amount,
+        uint48 expiration
     );
 
     /// @notice Emits an event when the owner successfully sets permissions using a permit signature on a token for the spender.
@@ -98,10 +106,11 @@ interface IAllowanceTransfer is IEIP712 {
     /// @notice A mapping from owner address to token address to spender address to PackedAllowance struct, which contains details and conditions of the approval.
     /// @notice The mapping is indexed in the above order see: allowance[ownerAddress][tokenAddress][spenderAddress]
     /// @dev The packed slot holds the allowed amount, expiration at which the allowed amount is no longer valid, and current nonce thats updated on any signature based approvals.
-    function allowance(address user, address token, address spender)
-        external
-        view
-        returns (uint160 amount, uint48 expiration, uint48 nonce);
+    function allowance(
+        address user,
+        address token,
+        address spender
+    ) external view returns (uint160 amount, uint48 expiration, uint48 nonce);
 
     /// @notice Approves the spender to use up to amount of the specified token up until the expiration
     /// @param token The token to approve
@@ -117,14 +126,22 @@ interface IAllowanceTransfer is IEIP712 {
     /// @param owner The owner of the tokens being approved
     /// @param permitSingle Data signed over by the owner specifying the terms of approval
     /// @param signature The owner's signature over the permit data
-    function permit(address owner, PermitSingle memory permitSingle, bytes calldata signature) external;
+    function permit(
+        address owner,
+        PermitSingle memory permitSingle,
+        bytes calldata signature
+    ) external;
 
     /// @notice Permit a spender to the signed amounts of the owners tokens via the owner's EIP-712 signature
     /// @dev May fail if the owner's nonce was invalidated in-flight by invalidateNonce
     /// @param owner The owner of the tokens being approved
     /// @param permitBatch Data signed over by the owner specifying the terms of approval
     /// @param signature The owner's signature over the permit data
-    function permit(address owner, PermitBatch memory permitBatch, bytes calldata signature) external;
+    function permit(
+        address owner,
+        PermitBatch memory permitBatch,
+        bytes calldata signature
+    ) external;
 
     /// @notice Transfer approved tokens from one address to another
     /// @param from The address to transfer from

@@ -39,7 +39,7 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
                 emit PriceFeedBroken(index, address(priceFeeds[index]));
             }
         }
-        
+
         revert("PriceFeed: Price feed price is stale");
     }
 
@@ -62,7 +62,7 @@ contract PriceFeed is PriceFeedStorage, IPriceFeed {
         emit LastGoodPriceUpdated(_currentPrice);
     }
 
-    function getPriceFeedAtIndex(uint8 _index) external view returns(address) {
+    function getPriceFeedAtIndex(uint8 _index) external view returns (address) {
         return address(priceFeeds[_index]);
     }
 }

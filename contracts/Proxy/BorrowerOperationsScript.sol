@@ -5,7 +5,6 @@ pragma solidity 0.6.11;
 import "../Dependencies/CheckContract.sol";
 import "../Interfaces/IBorrowerOperations.sol";
 
-
 contract BorrowerOperationsScript is CheckContract {
     IBorrowerOperations immutable borrowerOperations;
 
@@ -14,8 +13,18 @@ contract BorrowerOperationsScript is CheckContract {
         borrowerOperations = _borrowerOperations;
     }
 
-    function openTrove(uint _maxFee, uint _ZUSDAmount, address _upperHint, address _lowerHint) external payable {
-        borrowerOperations.openTrove{ value: msg.value }(_maxFee, _ZUSDAmount, _upperHint, _lowerHint);
+    function openTrove(
+        uint _maxFee,
+        uint _ZUSDAmount,
+        address _upperHint,
+        address _lowerHint
+    ) external payable {
+        borrowerOperations.openTrove{ value: msg.value }(
+            _maxFee,
+            _ZUSDAmount,
+            _upperHint,
+            _lowerHint
+        );
     }
 
     function addColl(address _upperHint, address _lowerHint) external payable {
@@ -26,7 +35,12 @@ contract BorrowerOperationsScript is CheckContract {
         borrowerOperations.withdrawColl(_amount, _upperHint, _lowerHint);
     }
 
-    function withdrawZUSD(uint _maxFee, uint _amount, address _upperHint, address _lowerHint) external {
+    function withdrawZUSD(
+        uint _maxFee,
+        uint _amount,
+        address _upperHint,
+        address _lowerHint
+    ) external {
         borrowerOperations.withdrawZUSD(_maxFee, _amount, _upperHint, _lowerHint);
     }
 
@@ -38,8 +52,22 @@ contract BorrowerOperationsScript is CheckContract {
         borrowerOperations.closeTrove();
     }
 
-    function adjustTrove(uint _maxFee, uint _collWithdrawal, uint _debtChange, bool isDebtIncrease, address _upperHint, address _lowerHint) external payable {
-        borrowerOperations.adjustTrove{ value: msg.value }(_maxFee, _collWithdrawal, _debtChange, isDebtIncrease, _upperHint, _lowerHint);
+    function adjustTrove(
+        uint _maxFee,
+        uint _collWithdrawal,
+        uint _debtChange,
+        bool isDebtIncrease,
+        address _upperHint,
+        address _lowerHint
+    ) external payable {
+        borrowerOperations.adjustTrove{ value: msg.value }(
+            _maxFee,
+            _collWithdrawal,
+            _debtChange,
+            isDebtIncrease,
+            _upperHint,
+            _lowerHint
+        );
     }
 
     function claimCollateral() external {

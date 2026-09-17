@@ -119,20 +119,18 @@ contract ZEROToken is ZEROTokenStorage, CheckContract, IZEROToken {
         return true;
     }
 
-    function increaseAllowance(address spender, uint256 addedValue)
-        external
-        override
-        returns (bool)
-    {
+    function increaseAllowance(
+        address spender,
+        uint256 addedValue
+    ) external override returns (bool) {
         _approve(msg.sender, spender, _allowances[msg.sender][spender].add(addedValue));
         return true;
     }
 
-    function decreaseAllowance(address spender, uint256 subtractedValue)
-        external
-        override
-        returns (bool)
-    {
+    function decreaseAllowance(
+        address spender,
+        uint256 subtractedValue
+    ) external override returns (bool) {
         _approve(
             msg.sender,
             spender,
@@ -174,7 +172,14 @@ contract ZEROToken is ZEROTokenStorage, CheckContract, IZEROToken {
                 "\x19\x01",
                 domainSeparator(),
                 keccak256(
-                    abi.encode(_PERMIT_TYPEHASH, owner, spender, amount, _nonces[owner]++, deadline)
+                    abi.encode(
+                        _PERMIT_TYPEHASH,
+                        owner,
+                        spender,
+                        amount,
+                        _nonces[owner]++,
+                        deadline
+                    )
                 )
             )
         );
@@ -204,17 +209,16 @@ contract ZEROToken is ZEROTokenStorage, CheckContract, IZEROToken {
         return keccak256(abi.encode(typeHash, name, version, _chainID(), address(this)));
     }
 
-    function _transfer(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) internal {
+    function _transfer(address sender, address recipient, uint256 amount) internal {
         return; // disable the func call - ZEROToken is not used in beta
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
         require(presale.isClosed(), "Presale is not over yet");
 
-        _balances[sender] = _balances[sender].sub(amount, "ERC20: transfer amount exceeds balance");
+        _balances[sender] = _balances[sender].sub(
+            amount,
+            "ERC20: transfer amount exceeds balance"
+        );
         _balances[recipient] = _balances[recipient].add(amount);
 
         emit Transfer(sender, recipient, amount);
@@ -239,11 +243,7 @@ contract ZEROToken is ZEROTokenStorage, CheckContract, IZEROToken {
         emit Transfer(account, address(0), amount);
     }
 
-    function _approve(
-        address owner,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _approve(address owner, address spender, uint256 amount) internal {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 

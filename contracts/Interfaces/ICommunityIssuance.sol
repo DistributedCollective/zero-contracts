@@ -2,10 +2,9 @@
 
 pragma solidity 0.6.11;
 
-interface ICommunityIssuance { 
-    
+interface ICommunityIssuance {
     // --- Events ---
-    
+
     event SOVTokenAddressSet(address _zeroTokenAddress);
     event ZUSDTokenAddressSet(address _zusdTokenAddress);
     event StabilityPoolAddressSet(address _stabilityPoolAddress);
@@ -54,7 +53,7 @@ interface ICommunityIssuance {
     function setRewardManager(address _rewardManagerAddress) external;
 
     /// @notice issues SOV tokens based on total zusd is deposited.
-    /// @return SOV tokens issuance 
+    /// @return SOV tokens issuance
     function issueSOV(uint256 _totalZUSDDeposits) external returns (uint256);
 
     /// @notice sends ZERO tokens to given account
