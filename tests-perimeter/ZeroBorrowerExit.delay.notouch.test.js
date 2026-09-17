@@ -1,12 +1,17 @@
 // Perimeter security perimeter — Zero DELAY no-touch regression.
 //
 // With the perimeter ACTIVE (controller enabled, d>0) and the queue WIRED,
-// proves the delay reroute fires ONLY on the voluntary collateral-out chokepoint
-// and is EXEMPT on the involuntary/keeper paths — liquidation, redemption, and
-// stability-pool ETH-gain withdrawal route their collateral through
-// TroveManager / StabilityPool, NOT through BorrowerOperations._sendCollWithExitFee,
-// so the queue is never touched (lastRequestId stays 0, no RBTC escrowed). A
-// keeper/liquidator/redeemer payout must never be escrowed behind a delay.
+// proves the withdrawal delay reroute fires ONLY on the voluntary
+// collateral-out chokepoint and is EXEMPT elsewhere, for two separate
+// reasons. Liquidation and the stability-pool ETH-gain withdrawal are
+// keeper-driven paths whose collateral routes through TroveManager /
+// StabilityPool, NOT through BorrowerOperations._sendCollWithExitFee, so
+// they never reach the chokepoint. Redemption is a swap — collateral
+// exchanged for ZUSD at face value, not a withdrawal — so it sits outside
+// the withdrawal delay's scope regardless of which contract routes it.
+// None of the three touches the queue (lastRequestId stays 0, no RBTC
+// escrowed). A keeper/liquidator/redeemer payout must never be escrowed
+// behind the withdrawal delay.
 
 const deploymentHelper = require("../utils/js/deploymentHelpers.js");
 const testHelpers = require("../utils/js/testHelpers.js");
