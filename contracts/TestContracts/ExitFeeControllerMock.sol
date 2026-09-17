@@ -10,11 +10,12 @@ import "../Interfaces/perimeter/IExitFeeController.sol";
 ///         cannot be compiled into the 0.6.11 zero-contracts workspace, so the
 ///         hooks are exercised against this configurable stand-in.
 ///
-///         Only `quoteExitFee` is implemented (the single selector the product
-///         hook calls). It deliberately does NOT inherit `IExitFeeController` so
-///         we avoid stubbing the full admin/view surface; the selector + ABI of
-///         `quoteExitFee` match, which is all `IExitFeeController(ctrl).quoteExitFee`
-///         needs at the call site.
+///         Only `quoteExitFee` and `quoteExitDelayFor` are implemented (the two
+///         selectors the product hooks call). It deliberately does NOT inherit
+///         `IExitFeeController` so we avoid stubbing the full admin/view
+///         surface; the selector + ABI of each match what
+///         `IExitFeeController(ctrl).quoteExitFee` /
+///         `.quoteExitDelayFor` need at the call site.
 contract ExitFeeControllerMock {
     bool public doRevert; // when true, quoteExitFee reverts → exercises CONTROLLER_REVERT fail-open
     bool public activeFlag;
