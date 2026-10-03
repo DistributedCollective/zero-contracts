@@ -6,6 +6,22 @@ const getContractNameFromScriptFileName = (filename) => {
     return filename.substring(filename.lastIndexOf("-") + 1, filename.lastIndexOf("."));
 };
 
+const assertPerimeterDeploymentNetwork = (network: HardhatRuntimeEnvironment["network"]) => {
+    if (network.tags.testnet && network.tags.mainnet) {
+        throw new Error("PerimeterOps: conflicting mainnet/testnet network tags");
+    }
+    if (!network.tags.testnet && !network.tags.mainnet) {
+        const url = "url" in network.config ? network.config.url : undefined;
+        const localEndpoint =
+            (network.name === "localhost" || network.name === "rskdev") &&
+            typeof url === "string" &&
+            ["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname);
+        if (network.name !== "hardhat" && !localEndpoint) {
+            throw new Error("PerimeterOps: explicit mainnet/testnet network tags are required");
+        }
+    }
+};
+
 const arrayToUnique = (value, index, self) => {
     return self.indexOf(value) === index;
 };
@@ -27,4 +43,10 @@ const logTimer = (time, passedTime) => {
     process.stdout.write(hoursStr + ":" + minutesStr + ":" + secondsStr);
 };
 
-export { getContractNameFromScriptFileName, arrayToUnique, logTimer, delay };
+export {
+    getContractNameFromScriptFileName,
+    assertPerimeterDeploymentNetwork,
+    arrayToUnique,
+    logTimer,
+    delay,
+};

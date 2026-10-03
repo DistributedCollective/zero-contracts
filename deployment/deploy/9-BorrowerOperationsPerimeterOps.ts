@@ -1,5 +1,8 @@
 import { DeployFunction } from "hardhat-deploy/types";
-import { getContractNameFromScriptFileName } from "../../scripts/helpers/utils";
+import {
+    getContractNameFromScriptFileName,
+    assertPerimeterDeploymentNetwork,
+} from "../../scripts/helpers/utils";
 const path = require("path");
 import Logs from "node-logs";
 const logger = new Logs().showInConsole(true);
@@ -8,6 +11,7 @@ import * as helpers from "../../scripts/helpers/helpers";
 const deploymentName = getContractNameFromScriptFileName(path.basename(__filename));
 
 const func: DeployFunction = async (hre) => {
+    assertPerimeterDeploymentNetwork(hre.network);
     const {
         getNamedAccounts,
         ethers,
@@ -24,11 +28,34 @@ const func: DeployFunction = async (hre) => {
         log: true,
     });
 
-    const prevImpl = await borrowerOperations.perimeterOps();
+    if (network.tags.mainnet) {
+        log(
+            `>>> Add BorrowerOperations.setPerimeterOps(${tx.address}) at ${borrowerOperations.target} to a SIP AFTER its implementation upgrade`
+        );
+        return;
+    }
+
+    let prevImpl: string;
+    try {
+        prevImpl = await borrowerOperations.getFunction("perimeterOps")();
+    } catch (error) {
+        const failure = error as { code?: string; data?: string; value?: string };
+        if (
+            network.tags.testnet &&
+            ((failure?.code === "CALL_EXCEPTION" && failure.data === "0x") ||
+                (failure?.code === "BAD_DATA" && failure.value === "0x"))
+        ) {
+            log(
+                `>>> ${deploymentName} deployed at ${tx.address}; implementation upgrade is pending or the hook getter is unavailable. Execute the BorrowerOperations upgrade, then rerun this deployment to submit setPerimeterOps`
+            );
+            return;
+        }
+        throw error;
+    }
     log(`Current ${deploymentName}: ${prevImpl}`);
 
-    if (tx.newlyDeployed || tx.address != prevImpl) {
-        if (tx.address != prevImpl) {
+    if (tx.address.toLowerCase() !== prevImpl.toLowerCase()) {
+        if (!tx.newlyDeployed) {
             logger.information(
                 `${deploymentName} is reused. However it was not set in the BorrowerOperations contract as perimeterOps yet.`
             );
@@ -51,10 +78,6 @@ const func: DeployFunction = async (hre) => {
                 data,
                 deployer
             );
-        } else if (network.tags.mainnet) {
-            // create SIP message
-            console.log("mainnet");
-            logger.info(`>>> Add ${deploymentName} address ${tx.address} update to a SIP`);
         } else {
             // just set the hook directly
             console.log("else!");
