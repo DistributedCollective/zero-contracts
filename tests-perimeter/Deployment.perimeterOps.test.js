@@ -92,8 +92,13 @@ function deploymentFixture({
     const hre = {
         network: { name, tags, config: { url } },
         getNamedAccounts: async () => ({ deployer }),
-        ethers: { getContract: async () => borrowerOperations },
+        ethers: {
+            getContract: async () => borrowerOperations,
+            getContractAt: async () => ({ getImplementation: async () => candidate }),
+            provider: { getCode: async () => "0x6000" },
+        },
         deployments: {
+            getOrNull: async () => ({ address: proxy }),
             get: async (deploymentName) => ({
                 address: deploymentName === "MultiSigWallet" ? multisig : candidate,
             }),

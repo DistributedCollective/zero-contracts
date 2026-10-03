@@ -2,6 +2,9 @@ import { DeployFunction } from "hardhat-deploy/types";
 import {
     getContractNameFromScriptFileName,
     assertPerimeterDeploymentNetwork,
+    assertZeroDelayDeploymentCandidate,
+    resolveZeroDelayDeploymentNetwork,
+    preflightZeroDelayDeployment,
 } from "../../scripts/helpers/utils";
 const path = require("path");
 import Logs from "node-logs";
@@ -12,6 +15,11 @@ const deploymentName = getContractNameFromScriptFileName(path.basename(__filenam
 
 const func: DeployFunction = async (hre) => {
     assertPerimeterDeploymentNetwork(hre.network);
+    assertZeroDelayDeploymentCandidate(
+        await resolveZeroDelayDeploymentNetwork(hre),
+        deploymentName
+    );
+    await preflightZeroDelayDeployment(hre);
     const {
         getNamedAccounts,
         ethers,

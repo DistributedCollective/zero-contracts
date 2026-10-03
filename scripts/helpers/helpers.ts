@@ -16,6 +16,11 @@ import {
 import { TransactionReceipt, TransactionResponse } from "@ethersproject/providers";
 import { Address } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import {
+    assertZeroDelayProxyCandidate,
+    resolveZeroDelayDeploymentNetwork,
+    preflightZeroDelayDeployment,
+} from "./utils";
 import { GovernorAlpha, MultiSigWallet } from "types/generated";
 import Logs from "node-logs";
 const logger = new Logs().showInConsole(true);
@@ -344,6 +349,8 @@ const deployWithCustomProxy = async (
     args: any[] = [],
     proxyArgs: any[] = []
 ) => {
+    assertZeroDelayProxyCandidate(await resolveZeroDelayDeploymentNetwork(hre), logicName);
+    await preflightZeroDelayDeployment(hre);
     const {
         deployments: { deploy, get, getOrNull, log, save: deploymentsSave },
         ethers,

@@ -22,6 +22,88 @@ const assertPerimeterDeploymentNetwork = (network: HardhatRuntimeEnvironment["ne
     }
 };
 
+const ZERO_DELAY_RELEASE_CANDIDATES = [
+    "BorrowerOperations",
+    "CollSurplusPool",
+    "TroveManager",
+    "BorrowerOperationsPerimeterOps",
+];
+
+const isZeroDelayReleaseNetwork = (network: HardhatRuntimeEnvironment["network"]) =>
+    Boolean(
+        network.tags.mainnet ||
+            network.tags.testnet ||
+            network.tags.forked ||
+            ("forking" in network.config &&
+                network.config.forking?.url &&
+                network.config.forking.enabled !== false)
+    );
+
+const resolveZeroDelayDeploymentNetwork = async (hre: HardhatRuntimeEnvironment) => {
+    if (hre.network.name !== "hardhat" || !hre.network.provider) return hre.network;
+    const metadata = await hre.network.provider.send("hardhat_metadata");
+    return metadata.forkedNetwork
+        ? { ...hre.network, tags: { ...hre.network.tags, forked: true } }
+        : hre.network;
+};
+
+const assertZeroDelayProxyCandidate = (
+    network: HardhatRuntimeEnvironment["network"],
+    name: string
+) => {
+    assertZeroDelayDeploymentCandidate(network, name);
+    if (
+        isZeroDelayReleaseNetwork(network) &&
+        !ZERO_DELAY_RELEASE_CANDIDATES.slice(0, 3).includes(name)
+    ) {
+        throw new Error(`Zero delay release: ${name} is not an approved proxy candidate`);
+    }
+};
+
+const assertZeroDelayDeploymentCandidate = (
+    network: HardhatRuntimeEnvironment["network"],
+    name: string
+) => {
+    assertPerimeterDeploymentNetwork(network);
+    if (isZeroDelayReleaseNetwork(network) && !ZERO_DELAY_RELEASE_CANDIDATES.includes(name)) {
+        throw new Error(`Zero delay release: ${name} is not an approved candidate`);
+    }
+};
+
+const assertZeroDelayDeploymentSelection = (
+    network: HardhatRuntimeEnvironment["network"],
+    options: { tags?: string; reset?: boolean; tagsRequireAll?: boolean }
+) => {
+    assertPerimeterDeploymentNetwork(network);
+    if (!isZeroDelayReleaseNetwork(network)) return;
+    const selected = options.tags?.split(",").filter(Boolean) || [];
+    if (options.reset || options.tagsRequireAll || selected.length === 0) {
+        throw new Error(
+            "Zero delay release: explicit candidate tags without reset or require-all are required"
+        );
+    }
+    for (const name of selected) assertZeroDelayDeploymentCandidate(network, name);
+};
+
+const preflightZeroDelayDeployment = async (hre: HardhatRuntimeEnvironment) => {
+    const network = await resolveZeroDelayDeploymentNetwork(hre);
+    assertPerimeterDeploymentNetwork(network);
+    if (!isZeroDelayReleaseNetwork(network)) return;
+    for (const name of ZERO_DELAY_RELEASE_CANDIDATES.slice(0, 3)) {
+        const proxy = await hre.deployments.getOrNull(`${name}_Proxy`);
+        if (!proxy)
+            throw new Error(`Zero delay release: existing proxy record required for ${name}`);
+        if ((await hre.ethers.provider.getCode(proxy.address)) === "0x") {
+            throw new Error(`Zero delay release: existing proxy code missing for ${name}`);
+        }
+        const contract = await hre.ethers.getContractAt("UpgradableProxy", proxy.address);
+        const implementation = await contract.getImplementation();
+        if ((await hre.ethers.provider.getCode(implementation)) === "0x") {
+            throw new Error(`Zero delay release: implementation code missing for ${name}`);
+        }
+    }
+};
+
 const arrayToUnique = (value, index, self) => {
     return self.indexOf(value) === index;
 };
@@ -46,6 +128,13 @@ const logTimer = (time, passedTime) => {
 export {
     getContractNameFromScriptFileName,
     assertPerimeterDeploymentNetwork,
+    ZERO_DELAY_RELEASE_CANDIDATES,
+    isZeroDelayReleaseNetwork,
+    resolveZeroDelayDeploymentNetwork,
+    assertZeroDelayProxyCandidate,
+    assertZeroDelayDeploymentCandidate,
+    assertZeroDelayDeploymentSelection,
+    preflightZeroDelayDeployment,
     arrayToUnique,
     logTimer,
     delay,
