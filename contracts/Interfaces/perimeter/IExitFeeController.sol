@@ -24,7 +24,7 @@ pragma experimental ABIEncoderV2;
 ///         same ABI. Products compiled under a pragma this file cannot span
 ///         declare their own ABI-equivalent variant instead.
 ///         Zero's hooks call `quoteExitFee` and `quoteExitDelayFor`; the rest is
-///         declared for completeness.
+///         a selected operational catalog, not the controller's complete ABI.
 /// @dev    `quoteExitDelayFor(address,address,address,bytes32,address) view
 ///         returns (uint32,address,address)` must stay ABI-identical, as
 ///         other perimeter components call it by that exact selector.
@@ -134,7 +134,7 @@ interface IExitFeeController {
     ///         returns the originator and owner unchanged, so the quote and
     ///         the record share the same identity. The hook MUST ignore
     ///         `effOrig` / `effOwner` and pay direct whenever `d == 0`.
-    /// @return d        Delay seconds to escrow for (0 ⇒ off / inactive / bypassed).
+    /// @return d        Delay seconds to escrow for (0 ⇒ off / bypassed).
     /// @return effOrig  The originator, unchanged.
     /// @return effOwner The owner, unchanged.
     function quoteExitDelayFor(
@@ -145,8 +145,8 @@ interface IExitFeeController {
         address subProduct
     ) external view returns (uint32 d, address effOrig, address effOwner);
 
-    /// @notice Inner per-actor delay view (off / inactive / bypass ⇒ 0, else
-    ///         `globalDelaySeconds`) on an already-effective actor; off-chain use.
+    /// @notice Inner per-actor delay view (off / bypass ⇒ 0, else
+    ///         `globalDelaySeconds`) on the originator; off-chain use.
     function quoteExitDelay(
         bytes32 surfaceId,
         address subProduct,

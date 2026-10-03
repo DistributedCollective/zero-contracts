@@ -41,7 +41,7 @@ contract BorrowerOperations is
 
     // --- Security-perimeter exit-delay hook ---
     // The delay queue pointer also lives in an EIP-1967-style unstructured
-    // slot, so `BorrowerOperations` storage-layout is unchanged (zero-diff). It is
+    // slot, so this pointer consumes no regular storage slot. It is
     // rotated with `setExitDelayQueue` under the SAME owner as the controller
     // pointer. Because the pointer redirects ESCROW it is more sensitive than the
     // controller pointer — rotation is an Owner/SIP action.

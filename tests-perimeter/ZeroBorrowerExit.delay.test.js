@@ -19,6 +19,7 @@
 const deploymentHelper = require("../utils/js/deploymentHelpers.js");
 const testHelpers = require("../utils/js/testHelpers.js");
 const timeMachine = require("ganache-time-traveler");
+const { assertRevertWithReason } = require("./utils/assertions.js");
 
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol");
 const TroveManagerTester = artifacts.require("TroveManagerTester");
@@ -26,6 +27,8 @@ const MassetManagerTester = artifacts.require("MassetManagerTester");
 const ExitFeeControllerMock = artifacts.require("ExitFeeControllerMock");
 const MockExitDelayQueue = artifacts.require("MockExitDelayQueue");
 const NonPayable = artifacts.require("NonPayable");
+const BorrowerOperationsPerimeterOps = artifacts.require("BorrowerOperationsPerimeterOps");
+const Destructible = artifacts.require("Destructible");
 
 const th = testHelpers.TestHelper;
 const dec = th.dec;
@@ -123,11 +126,18 @@ contract("Perimeter delay — Zero borrower exit reroute", async (accounts) => {
     // ── Pointer wiring ──────────────────────────────────────────────────────
 
     it("setExitDelayQueue: only owner, rejects zero + non-contract, rotatable, emits event", async () => {
-        await th.assertRevert(
-            borrowerOperations.setExitDelayQueue(queue.address, { from: alice })
+        await assertRevertWithReason(
+            borrowerOperations.setExitDelayQueue(queue.address, { from: alice }),
+            "Ownable:: access denied"
         );
-        await th.assertRevert(borrowerOperations.setExitDelayQueue(ZERO_ADDRESS, { from: owner }));
-        await th.assertRevert(borrowerOperations.setExitDelayQueue(alice, { from: owner })); // EOA / no code
+        await assertRevertWithReason(
+            borrowerOperations.setExitDelayQueue(ZERO_ADDRESS, { from: owner }),
+            "EDQ:zero"
+        );
+        await assertRevertWithReason(
+            borrowerOperations.setExitDelayQueue(alice, { from: owner }),
+            "Account code size cannot be zero"
+        );
 
         const tx = await borrowerOperations.setExitDelayQueue(queue.address, { from: owner });
         assert.equal(await borrowerOperations.exitDelayQueue(), queue.address);
@@ -138,6 +148,63 @@ contract("Perimeter delay — Zero borrower exit reroute", async (accounts) => {
         const queue2 = await MockExitDelayQueue.new(MIN_DELAY);
         await borrowerOperations.setExitDelayQueue(queue2.address, { from: owner });
         assert.equal(await borrowerOperations.exitDelayQueue(), queue2.address);
+    });
+
+    it("setPerimeterOps: only owner, rejects code-less targets and preserves the previous hook on failure", async () => {
+        const previous = await borrowerOperations.perimeterOps();
+        const replacement = await BorrowerOperationsPerimeterOps.new();
+        await assertRevertWithReason(
+            borrowerOperations.setPerimeterOps(replacement.address, { from: alice }),
+            "Ownable:: access denied"
+        );
+        await assertRevertWithReason(
+            borrowerOperations.setPerimeterOps(ZERO_ADDRESS, { from: owner }),
+            "Account cannot be zero address"
+        );
+        await assertRevertWithReason(
+            borrowerOperations.setPerimeterOps(alice, { from: owner }),
+            "Account code size cannot be zero"
+        );
+        assert.equal(await borrowerOperations.perimeterOps(), previous);
+
+        const tx = await borrowerOperations.setPerimeterOps(replacement.address, { from: owner });
+        const event = getEvent(tx, "PerimeterOpsSet");
+        assert.equal(event.args.previous, previous);
+        assert.equal(event.args.current, replacement.address);
+        assert.equal(await borrowerOperations.perimeterOps(), replacement.address);
+
+        await openTrove({
+            ICR: toBN(dec(10, 18)),
+            extraParams: { from: alice, value: toBN(dec(100, "ether")) },
+        });
+        await wire();
+        const gross = toBN(dec(1, "ether"));
+        await borrowerOperations.withdrawColl(gross, alice, alice, { from: alice });
+        assert.isTrue((await queue.totalEscrowed(ZERO_ADDRESS)).eq(gross));
+    });
+
+    it("a settlement hook that loses its code cannot silently consume a collateral withdrawal", async () => {
+        await openTrove({
+            ICR: toBN(dec(10, 18)),
+            extraParams: { from: alice, value: toBN(dec(100, "ether")) },
+        });
+        await wire();
+        const collateralBefore = await getTroveEntireColl(alice);
+        const poolBefore = await activePool.getETH();
+        const hook = await Destructible.new();
+        await borrowerOperations.setPerimeterOps(hook.address, { from: owner });
+        assert.notEqual(await web3.eth.getCode(hook.address), "0x");
+        await hook.destruct(owner);
+        assert.equal(await web3.eth.getCode(hook.address), "0x", "hook code was not cleared");
+
+        await assertRevertWithReason(
+            borrowerOperations.withdrawColl(toBN(dec(1, "ether")), alice, alice, { from: alice }),
+            "Account code size cannot be zero"
+        );
+        assert.isTrue((await getTroveEntireColl(alice)).eq(collateralBefore));
+        assert.isTrue((await activePool.getETH()).eq(poolBefore));
+        assert.equal((await queue.lastRequestId()).toString(), "0");
+        assert.isTrue((await queue.totalEscrowed(ZERO_ADDRESS)).isZero());
     });
 
     // ── withdrawColl reroute (d>0, no fee) ──────────────────────────────────

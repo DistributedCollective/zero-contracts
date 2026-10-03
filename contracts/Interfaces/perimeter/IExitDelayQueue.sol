@@ -40,12 +40,12 @@ interface IExitDelayQueue {
     struct ExitRequest {
         // word 1 (128 + 64 + 64 = 256 bits):
         uint128 amount; //    narrowed from the uint256 Perimeter amount at record
-        uint64 createdAt; //  audit/analytics; emitted in ExitQueued
+        uint64 createdAt; //  audit/analytics; stored in the request
         uint64 unlockAt; //   COMPUTED by the queue = createdAt + delaySeconds
         // words 2-5:
         address originator; // withdrawal caller (effective, post-normalization) — block key + executor
         address owner; //      position owner — MANDATORY block key + executor
-        address receiver; //   immutable payout destination — block key iff freezeReceiver; may recover, but is not a deliverer
+        address receiver; //   immutable payout destination — block key iff freezeReceiver; executor + stuck-payout recovery
         address token; //      address(0) = native RBTC
         // word 6:
         bytes32 surfaceId; //  provenance: recovery-route key
@@ -119,7 +119,7 @@ interface IExitDelayQueue {
 
     error UnregisteredSource(address caller); //  onlyAllowedSource — DISTINCT record-path halt selector
     error ActorBlocked(address actor, BlockState state); // execution-gate revert (event: AccountBlocked)
-    error NotExecutor(address caller); //         delivery: msg.sender ∉ {originator, owner} and the owner has no code; recovery: ∉ {originator, owner, receiver}
+    error NotExecutor(address caller); //         delivery: msg.sender ∉ {originator, owner, receiver} and the owner has no code; recovery: ∉ {originator, owner, receiver}
     error NotUnlocked(uint256 id, uint64 unlockAt);
     error QueuePaused();
     error AlreadyTerminal(uint256 id); //         status != Queued at a transition (also duplicate-batch-id)

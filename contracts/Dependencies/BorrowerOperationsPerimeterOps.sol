@@ -235,10 +235,10 @@ contract BorrowerOperationsPerimeterOps {
     ///         escrows the gross behind the hold and cannot bypass it — the same
     ///         rule the collateral exit follows.
     ///
-    ///         When the perimeter imposes no delay this is the existing claim,
-    ///         unchanged: `claimCollWithFee` on the charging path and the
-    ///         untouched `claimColl` otherwise, both paying the claimant
-    ///         directly. When it does, the pool sends the net leg to the queue
+    ///         With no delay, charging claims use `claimCollWithFeeTo` with the
+    ///         claimant as recipient, preserving the legacy payout semantics.
+    ///         Non-charging claims use the untouched `claimColl` path directly.
+    ///         With a positive hold, the pool sends the net leg to the queue
     ///         instead and the record follows in the same transaction. A record
     ///         failure reverts the whole claim, so a hold can never be silently
     ///         skipped; the claimant keeps their surplus balance and can claim

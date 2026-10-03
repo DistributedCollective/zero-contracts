@@ -24,6 +24,7 @@
 const deploymentHelper = require("../utils/js/deploymentHelpers.js");
 const testHelpers = require("../utils/js/testHelpers.js");
 const timeMachine = require("ganache-time-traveler");
+const { assertRevertWithReason } = require("./utils/assertions.js");
 
 const BorrowerOperationsTester = artifacts.require("./BorrowerOperationsTester.sol");
 const TroveManagerTester = artifacts.require("TroveManagerTester");
@@ -128,6 +129,57 @@ contract("Perimeter delay — Zero surplus claim reroute", async (accounts) => {
         );
         assert.isTrue((await queue.totalEscrowed(ZERO_ADDRESS)).eq(toBN(0)));
     };
+
+    it("claimCollWithFeeTo: only BorrowerOperations can consume a funded claim or redirect its payout", async () => {
+        await wireQueue();
+        const gross = await setupSurplus(alice);
+        const poolBefore = await collSurplusPool.getETH();
+        const receiverBefore = toBN(await web3.eth.getBalance(feeReceiver));
+        await assertRevertWithReason(
+            collSurplusPool.claimCollWithFeeTo(alice, ZERO_ADDRESS, 0, feeReceiver, {
+                from: dennis,
+            }),
+            "CollSurplusPool: Caller is not Borrower Operations"
+        );
+        assert.isTrue((await collSurplusPool.getCollateral(alice)).eq(gross));
+        assert.isTrue((await collSurplusPool.getETH()).eq(poolBefore));
+        assert.isTrue(toBN(await web3.eth.getBalance(feeReceiver)).eq(receiverBefore));
+        await assertQueueUntouched();
+
+        await borrowerOperations.claimCollateral({ from: alice });
+        assert.isTrue((await collSurplusPool.getCollateral(alice)).isZero());
+        assert.isTrue((await queue.totalEscrowed(ZERO_ADDRESS)).eq(gross));
+    });
+
+    it("a failed delayed record rolls back an already-paid fee and every surplus accounting change", async () => {
+        await wireQueue();
+        const gross = await setupSurplus(alice);
+        await controller.configure(true, 50, feeReceiver, NONE);
+        const fee = gross.mul(toBN(50)).div(toBN(10000));
+        assert.isTrue(fee.gt(toBN(0)), "rollback control must charge a positive fee");
+        await queue.setAllowedSource(borrowerOperations.address, false);
+        const poolBefore = await collSurplusPool.getETH();
+        const poolBalanceBefore = toBN(await web3.eth.getBalance(collSurplusPool.address));
+        const receiverBefore = toBN(await web3.eth.getBalance(feeReceiver));
+
+        await assertRevertWithReason(
+            borrowerOperations.claimCollateral({ from: alice }),
+            "MockQueue: unregistered source"
+        );
+        assert.isTrue((await collSurplusPool.getCollateral(alice)).eq(gross));
+        assert.isTrue((await collSurplusPool.getETH()).eq(poolBefore));
+        assert.isTrue(
+            toBN(await web3.eth.getBalance(collSurplusPool.address)).eq(poolBalanceBefore)
+        );
+        assert.isTrue(toBN(await web3.eth.getBalance(feeReceiver)).eq(receiverBefore));
+        await assertQueueUntouched();
+
+        await queue.setAllowedSource(borrowerOperations.address, true);
+        await borrowerOperations.claimCollateral({ from: alice });
+        assert.isTrue(toBN(await web3.eth.getBalance(feeReceiver)).eq(receiverBefore.add(fee)));
+        assert.isTrue((await queue.totalEscrowed(ZERO_ADDRESS)).eq(gross.sub(fee)));
+        assert.isTrue((await collSurplusPool.getCollateral(alice)).isZero());
+    });
 
     it("CONTROL (non-vacuous): the SAME arming reroutes a voluntary withdrawColl", async () => {
         await wireQueue();
