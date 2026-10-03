@@ -1,10 +1,14 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { deployWithCustomProxy } from "../../scripts/helpers/helpers";
-import { getContractNameFromScriptFileName } from "../../scripts/helpers/utils";
+import {
+    getContractNameFromScriptFileName,
+    preflightZeroDelayDeployment,
+} from "../../scripts/helpers/utils";
 const path = require("path");
 const deploymentName = getContractNameFromScriptFileName(path.basename(__filename));
 
 const func: DeployFunction = async (hre) => {
+    await preflightZeroDelayDeployment(hre);
     const { getNamedAccounts } = hre;
     const { deployer } = await getNamedAccounts();
 

@@ -3,12 +3,14 @@ import { deployWithCustomProxy } from "../../scripts/helpers/helpers";
 import {
     getContractNameFromScriptFileName,
     assertPerimeterDeploymentNetwork,
+    preflightZeroDelayDeployment,
 } from "../../scripts/helpers/utils";
 const path = require("path");
 const deploymentName = getContractNameFromScriptFileName(path.basename(__filename));
 
 const func: DeployFunction = async (hre) => {
     assertPerimeterDeploymentNetwork(hre.network);
+    await preflightZeroDelayDeployment(hre);
     const {
         deployments: { get },
         getNamedAccounts,

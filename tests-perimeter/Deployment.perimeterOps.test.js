@@ -20,6 +20,7 @@ function loadModule(filename, imports, messages) {
         exports: module.exports,
         __filename: filename,
         URL,
+        process: { env: {} },
         console: { log: (message) => messages.push(message) },
         require: (specifier) => {
             assert.ok(

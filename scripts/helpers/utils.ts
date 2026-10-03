@@ -40,11 +40,26 @@ const isZeroDelayReleaseNetwork = (network: HardhatRuntimeEnvironment["network"]
     );
 
 const resolveZeroDelayDeploymentNetwork = async (hre: HardhatRuntimeEnvironment) => {
-    if (hre.network.name !== "hardhat" || !hre.network.provider) return hre.network;
-    const metadata = await hre.network.provider.send("hardhat_metadata");
+    assertPerimeterDeploymentNetwork(hre.network);
+    if (!["hardhat", "localhost", "rskdev"].includes(hre.network.name) || !hre.network.provider)
+        return hre.network;
+    let metadata;
+    try {
+        metadata = await hre.network.provider.send("hardhat_metadata");
+    } catch (error) {
+        if (hre.network.name !== "hardhat" && (error as { code?: number }).code === -32601)
+            return hre.network;
+        throw error;
+    }
     return metadata.forkedNetwork
         ? { ...hre.network, tags: { ...hre.network.tags, forked: true } }
         : hre.network;
+};
+
+const assertZeroDelayDeploymentEnvironment = (network: HardhatRuntimeEnvironment["network"]) => {
+    if (isZeroDelayReleaseNetwork(network) && process.env.HARDHAT_DEPLOY_FIXTURE) {
+        throw new Error("Zero delay release: implicit deployment fixtures are not permitted");
+    }
 };
 
 const assertZeroDelayProxyCandidate = (
@@ -65,6 +80,7 @@ const assertZeroDelayDeploymentCandidate = (
     name: string
 ) => {
     assertPerimeterDeploymentNetwork(network);
+    assertZeroDelayDeploymentEnvironment(network);
     if (isZeroDelayReleaseNetwork(network) && !ZERO_DELAY_RELEASE_CANDIDATES.includes(name)) {
         throw new Error(`Zero delay release: ${name} is not an approved candidate`);
     }
@@ -75,6 +91,7 @@ const assertZeroDelayDeploymentSelection = (
     options: { tags?: string; reset?: boolean; tagsRequireAll?: boolean }
 ) => {
     assertPerimeterDeploymentNetwork(network);
+    assertZeroDelayDeploymentEnvironment(network);
     if (!isZeroDelayReleaseNetwork(network)) return;
     const selected = options.tags?.split(",").filter(Boolean) || [];
     if (options.reset || options.tagsRequireAll || selected.length === 0) {
@@ -88,6 +105,7 @@ const assertZeroDelayDeploymentSelection = (
 const preflightZeroDelayDeployment = async (hre: HardhatRuntimeEnvironment) => {
     const network = await resolveZeroDelayDeploymentNetwork(hre);
     assertPerimeterDeploymentNetwork(network);
+    assertZeroDelayDeploymentEnvironment(network);
     if (!isZeroDelayReleaseNetwork(network)) return;
     for (const name of ZERO_DELAY_RELEASE_CANDIDATES.slice(0, 3)) {
         const proxy = await hre.deployments.getOrNull(`${name}_Proxy`);

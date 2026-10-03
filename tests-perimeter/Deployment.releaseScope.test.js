@@ -9,7 +9,13 @@ const compiled = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
 }).outputText;
 const loaded = { exports: {} };
-vm.runInNewContext(compiled, { module: loaded, exports: loaded.exports, URL });
+const environment = { env: {} };
+vm.runInNewContext(compiled, {
+    module: loaded,
+    exports: loaded.exports,
+    URL,
+    process: environment,
+});
 const utils = loaded.exports;
 const tags = [
     "BorrowerOperations",
@@ -35,6 +41,7 @@ function loadScript(script, imports) {
             return imports[specifier];
         },
         console: { log: () => {} },
+        process: environment,
     });
     return loaded.exports;
 }
@@ -198,6 +205,90 @@ describe("Zero delay deployment frozen scope", function () {
             ),
             /not an approved proxy candidate/
         );
+    });
+
+    it("recognizes a Hardhat fork reached through an allowed localhost RPC", async function () {
+        const hre = fixture();
+        hre.network = {
+            name: "localhost",
+            tags: {},
+            config: { url: "http://127.0.0.1:8545" },
+            provider: { send: async () => ({ forkedNetwork: { chainId: 30 } }) },
+        };
+        hre.deployments.deploy = async () => {
+            throw new Error("DEPLOY_ACTION_REACHED");
+        };
+        await assert.rejects(
+            helper().deployWithCustomProxy(hre, "deployer", "ZUSDToken", "UpgradableProxy"),
+            /not an approved candidate/
+        );
+        assert.deepEqual(hre.calls, []);
+    });
+
+    it("rejects implicit global fixture mode before any deployment lookup", async function () {
+        environment.env.HARDHAT_DEPLOY_FIXTURE = "1";
+        const hre = fixture();
+        try {
+            await assert.rejects(
+                utils.preflightZeroDelayDeployment(hre),
+                /implicit deployment fixtures/
+            );
+            assert.deepEqual(hre.calls, []);
+        } finally {
+            delete environment.env.HARDHAT_DEPLOY_FIXTURE;
+        }
+    });
+
+    it("preserves a genuine local non-Hardhat node that has no metadata method", async function () {
+        const hre = fixture();
+        hre.network = {
+            name: "rskdev",
+            tags: {},
+            config: { url: "http://127.0.0.1:4444" },
+            provider: {
+                send: async () => {
+                    throw Object.assign(new Error("Method not found"), { code: -32601 });
+                },
+            },
+        };
+        await utils.preflightZeroDelayDeployment(hre);
+        assert.deepEqual(hre.calls, []);
+    });
+
+    it("fails closed on a loopback metadata read failure, not mistaken for a fresh node", async function () {
+        const hre = fixture();
+        hre.network = {
+            name: "localhost",
+            tags: {},
+            config: { url: "http://127.0.0.1:8545" },
+            provider: {
+                send: async () => {
+                    throw new Error("RPC_READ_FAILED");
+                },
+            },
+        };
+        await assert.rejects(utils.preflightZeroDelayDeployment(hre), /RPC_READ_FAILED/);
+        assert.deepEqual(hre.calls, []);
+    });
+
+    it("direct BO invocation rejects implicit fixtures before Permit2 lookup", async function () {
+        const script = loadScript("deployment/deploy/1-BorrowerOperations.ts", {
+            "../../scripts/helpers/utils": utils,
+            "../../scripts/helpers/helpers": helper(),
+            path,
+        });
+        const hre = fixture();
+        hre.getNamedAccounts = async () => ({ deployer: "deployer" });
+        hre.deployments.get = async () => {
+            throw new Error("IMPLICIT_FIXTURE_LOOKUP_REACHED");
+        };
+        environment.env.HARDHAT_DEPLOY_FIXTURE = "1";
+        try {
+            await assert.rejects(script.default(hre), /implicit deployment fixtures/);
+            assert.deepEqual(hre.calls, []);
+        } finally {
+            delete environment.env.HARDHAT_DEPLOY_FIXTURE;
+        }
     });
 
     it("the companion preflights the entire release before deploying", async function () {
