@@ -40,8 +40,8 @@
     "test:all": "hardhat test && hardhat test tests-perimeter/*.test.js",
     "coverage": "hardhat coverage",
     "coveralls": "cat coverage/lcov.info | coveralls",
-    "hh:fork-testnet": "yarn hardhat node --fork https://testnet.sovryn.app/rpc --no-deploy",
-    "hh:fork-mainnet": "yarn hardhat node --fork https://mainnet-dev.sovryn.app/rpc --no-deploy",
+    "hh:fork-testnet": "yarn hardhat node --fork https://testnet.sovryn.app/rpc --no-deploy --no-reset",
+    "hh:fork-mainnet": "yarn hardhat node --fork https://mainnet-dev.sovryn.app/rpc --no-deploy --no-reset",
     "hh:console-mainnet": "hardhat console --network rskSovrynMainnet",
     "hh:console-testnet": "hardhat console --network rskSovrynTestnet"
   },
