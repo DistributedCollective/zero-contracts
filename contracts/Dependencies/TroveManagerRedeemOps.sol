@@ -37,10 +37,7 @@ contract TroveManagerRedeemOps is TroveManagerBase {
      */
 
     /** Constructor */
-    constructor(
-        uint256 _bootstrapPeriod,
-        address _permit2
-    ) public TroveManagerBase(_bootstrapPeriod) {
+    constructor(uint256 _bootstrapPeriod, address _permit2) public TroveManagerBase(_bootstrapPeriod) {
         permit2 = IPermit2(_permit2);
     }
 

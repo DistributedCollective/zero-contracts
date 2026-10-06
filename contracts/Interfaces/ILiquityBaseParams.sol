@@ -3,6 +3,7 @@
 pragma solidity 0.6.11;
 
 interface ILiquityBaseParams {
+
     /// Minimum collateral ratio for individual troves
     function MCR() external view returns (uint);
 
@@ -20,4 +21,5 @@ interface ILiquityBaseParams {
     function REDEMPTION_FEE_FLOOR() external view returns (uint);
 
     function MAX_BORROWING_FEE() external view returns (uint);
+
 }

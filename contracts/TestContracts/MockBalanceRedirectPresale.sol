@@ -2,7 +2,9 @@
 
 pragma solidity 0.6.11;
 
-contract MockBalanceRedirectPresale {
+
+contract MockBalanceRedirectPresale  {
+
     bool public isClosed;
 
     function closePresale() public {

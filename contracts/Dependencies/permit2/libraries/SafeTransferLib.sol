@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import { ERC20 } from "../ERC20.sol";
+import {ERC20} from "../ERC20.sol";
 
 /// @notice Safe ETH and ERC20 transfer library that gracefully handles missing return values.
 /// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/utils/SafeTransferLib.sol)
@@ -28,7 +28,12 @@ library SafeTransferLib {
                             ERC20 OPERATIONS
     //////////////////////////////////////////////////////////////*/
 
-    function safeTransferFrom(ERC20 token, address from, address to, uint256 amount) internal {
+    function safeTransferFrom(
+        ERC20 token,
+        address from,
+        address to,
+        uint256 amount
+    ) internal {
         bool success;
 
         /// @solidity memory-safe-assembly
@@ -37,10 +42,7 @@ library SafeTransferLib {
             let freeMemoryPointer := mload(0x40)
 
             // Write the abi-encoded calldata into memory, beginning with the function selector.
-            mstore(
-                freeMemoryPointer,
-                0x23b872dd00000000000000000000000000000000000000000000000000000000
-            )
+            mstore(freeMemoryPointer, 0x23b872dd00000000000000000000000000000000000000000000000000000000)
             mstore(add(freeMemoryPointer, 4), from) // Append the "from" argument.
             mstore(add(freeMemoryPointer, 36), to) // Append the "to" argument.
             mstore(add(freeMemoryPointer, 68), amount) // Append the "amount" argument.
@@ -60,7 +62,11 @@ library SafeTransferLib {
         require(success, "TRANSFER_FROM_FAILED");
     }
 
-    function safeTransfer(ERC20 token, address to, uint256 amount) internal {
+    function safeTransfer(
+        ERC20 token,
+        address to,
+        uint256 amount
+    ) internal {
         bool success;
 
         /// @solidity memory-safe-assembly
@@ -69,10 +75,7 @@ library SafeTransferLib {
             let freeMemoryPointer := mload(0x40)
 
             // Write the abi-encoded calldata into memory, beginning with the function selector.
-            mstore(
-                freeMemoryPointer,
-                0xa9059cbb00000000000000000000000000000000000000000000000000000000
-            )
+            mstore(freeMemoryPointer, 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
             mstore(add(freeMemoryPointer, 4), to) // Append the "to" argument.
             mstore(add(freeMemoryPointer, 36), amount) // Append the "amount" argument.
 
@@ -91,7 +94,11 @@ library SafeTransferLib {
         require(success, "TRANSFER_FAILED");
     }
 
-    function safeApprove(ERC20 token, address to, uint256 amount) internal {
+    function safeApprove(
+        ERC20 token,
+        address to,
+        uint256 amount
+    ) internal {
         bool success;
 
         /// @solidity memory-safe-assembly
@@ -100,10 +107,7 @@ library SafeTransferLib {
             let freeMemoryPointer := mload(0x40)
 
             // Write the abi-encoded calldata into memory, beginning with the function selector.
-            mstore(
-                freeMemoryPointer,
-                0x095ea7b300000000000000000000000000000000000000000000000000000000
-            )
+            mstore(freeMemoryPointer, 0x095ea7b300000000000000000000000000000000000000000000000000000000)
             mstore(add(freeMemoryPointer, 4), to) // Append the "to" argument.
             mstore(add(freeMemoryPointer, 36), amount) // Append the "amount" argument.
 

@@ -5,8 +5,9 @@ pragma solidity 0.6.11;
 import "../Dependencies/CheckContract.sol";
 import "../Interfaces/ITroveManager.sol";
 
+
 contract TroveManagerScript is CheckContract {
-    string public constant NAME = "TroveManagerScript";
+    string constant public NAME = "TroveManagerScript";
 
     ITroveManager immutable troveManager;
 

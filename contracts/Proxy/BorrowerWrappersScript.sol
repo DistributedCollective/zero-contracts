@@ -15,10 +15,11 @@ import "./ETHTransferScript.sol";
 import "./ZEROStakingScript.sol";
 import "../Dependencies/console.sol";
 
+
 contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, ZEROStakingScript {
     using SafeMath for uint;
 
-    string public constant NAME = "BorrowerWrappersScript";
+    string constant public NAME = "BorrowerWrappersScript";
 
     ITroveManager immutable troveManager;
     IStabilityPool immutable stabilityPool;
@@ -36,9 +37,9 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         address _zusdTokenAddress,
         address _zeroTokenAddress
     )
-        public
         BorrowerOperationsScript(IBorrowerOperations(_borrowerOperationsAddress))
         ZEROStakingScript(_zeroStakingAddress)
+        public
     {
         checkContract(_troveManagerAddress);
         ITroveManager troveManagerCached = ITroveManager(_troveManagerAddress);
@@ -48,7 +49,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         checkContract(_stabilityPoolAddress);
         stabilityPool = stabilityPoolCached;
 
-        IPriceFeed priceFeedCached = IPriceFeed(_priceFeedAddress);
+        IPriceFeed priceFeedCached = IPriceFeed(_priceFeedAddress); 
         checkContract(_priceFeedAddress);
         priceFeed = priceFeedCached;
 
@@ -63,12 +64,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         zeroStaking = zeroStakingCached;
     }
 
-    function claimCollateralAndOpenTrove(
-        uint _maxFee,
-        uint _ZUSDAmount,
-        address _upperHint,
-        address _lowerHint
-    ) external payable {
+    function claimCollateralAndOpenTrove(uint _maxFee, uint _ZUSDAmount, address _upperHint, address _lowerHint) external payable {
         uint balanceBefore = address(this).balance;
 
         // Claim collateral
@@ -82,19 +78,10 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         uint totalCollateral = balanceAfter.sub(balanceBefore).add(msg.value);
 
         // Open trove with obtained collateral, plus collateral sent by user
-        borrowerOperations.openTrove{ value: totalCollateral }(
-            _maxFee,
-            _ZUSDAmount,
-            _upperHint,
-            _lowerHint
-        );
+        borrowerOperations.openTrove{ value: totalCollateral }(_maxFee, _ZUSDAmount, _upperHint, _lowerHint);
     }
 
-    function claimSPRewardsAndRecycle(
-        uint _maxFee,
-        address _upperHint,
-        address _lowerHint
-    ) external {
+    function claimSPRewardsAndRecycle(uint _maxFee, address _upperHint, address _lowerHint) external {
         uint collBalanceBefore = address(this).balance;
         uint zeroBalanceBefore = zeroToken.balanceOf(address(this));
 
@@ -109,14 +96,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         if (claimedCollateral > 0) {
             _requireUserHasTrove(address(this));
             uint ZUSDAmount = _getNetZUSDAmount(claimedCollateral);
-            borrowerOperations.adjustTrove{ value: claimedCollateral }(
-                _maxFee,
-                0,
-                ZUSDAmount,
-                true,
-                _upperHint,
-                _lowerHint
-            );
+            borrowerOperations.adjustTrove{ value: claimedCollateral }(_maxFee, 0, ZUSDAmount, true, _upperHint, _lowerHint);
             // Provide withdrawn ZUSD to Stability Pool
             if (ZUSDAmount > 0) {
                 stabilityPool.provideToSP(ZUSDAmount, address(0));
@@ -130,11 +110,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         }
     }
 
-    function claimStakingGainsAndRecycle(
-        uint _maxFee,
-        address _upperHint,
-        address _lowerHint
-    ) external {
+    function claimStakingGainsAndRecycle(uint _maxFee, address _upperHint, address _lowerHint) external {
         uint collBalanceBefore = address(this).balance;
         uint zusdBalanceBefore = zusdToken.balanceOf(address(this));
         uint zeroBalanceBefore = zeroToken.balanceOf(address(this));
@@ -150,14 +126,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
         if (gainedCollateral > 0) {
             _requireUserHasTrove(address(this));
             netZUSDAmount = _getNetZUSDAmount(gainedCollateral);
-            borrowerOperations.adjustTrove{ value: gainedCollateral }(
-                _maxFee,
-                0,
-                netZUSDAmount,
-                true,
-                _upperHint,
-                _lowerHint
-            );
+            borrowerOperations.adjustTrove{ value: gainedCollateral }(_maxFee, 0, netZUSDAmount, true, _upperHint, _lowerHint);
         }
 
         uint totalZUSD = gainedZUSD.add(netZUSDAmount);
@@ -171,6 +140,7 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
                 zeroStaking.stake(claimedZERO);
             }
         }
+
     }
 
     function _getNetZUSDAmount(uint _collateral) internal returns (uint) {
@@ -179,17 +149,12 @@ contract BorrowerWrappersScript is BorrowerOperationsScript, ETHTransferScript, 
 
         uint ZUSDAmount = _collateral.mul(price).div(ICR);
         uint borrowingRate = troveManager.getBorrowingRateWithDecay();
-        uint netDebt = ZUSDAmount.mul(LiquityMath.DECIMAL_PRECISION).div(
-            LiquityMath.DECIMAL_PRECISION.add(borrowingRate)
-        );
+        uint netDebt = ZUSDAmount.mul(LiquityMath.DECIMAL_PRECISION).div(LiquityMath.DECIMAL_PRECISION.add(borrowingRate));
 
         return netDebt;
     }
 
     function _requireUserHasTrove(address _depositor) internal view {
-        require(
-            troveManager.getTroveStatus(_depositor) == 1,
-            "BorrowerWrappersScript: caller must have an active trove"
-        );
+        require(troveManager.getTroveStatus(_depositor) == 1, "BorrowerWrappersScript: caller must have an active trove");
     }
 }

@@ -10,7 +10,7 @@ import "../Dependencies/Initializable.sol";
 contract CommunityIssuanceStorage is Ownable, Initializable {
     // --- Data ---
 
-    string public constant NAME = "CommunityIssuance";
+    string constant public NAME = "CommunityIssuance";
 
     uint256 constant MAX_BPS = 10000;
 

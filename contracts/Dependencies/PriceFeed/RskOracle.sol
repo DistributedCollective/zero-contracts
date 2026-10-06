@@ -8,6 +8,7 @@ interface IRSKOracle {
 }
 
 contract RskOracle is IExternalPriceFeed {
+  
     IRSKOracle rskOracle;
 
     constructor(address _address) public {

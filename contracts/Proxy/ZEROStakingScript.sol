@@ -5,6 +5,7 @@ pragma solidity 0.6.11;
 import "../Dependencies/CheckContract.sol";
 import "../Interfaces/IZEROStaking.sol";
 
+
 contract ZEROStakingScript is CheckContract {
     IZEROStaking immutable ZEROStaking;
 
