@@ -1,5 +1,9 @@
 import { DeployFunction } from "hardhat-deploy/types";
-import { getContractNameFromScriptFileName } from "../../scripts/helpers/utils";
+import {
+    getContractNameFromScriptFileName,
+    assertZeroDelayDeploymentCandidate,
+    resolveZeroDelayDeploymentNetwork,
+} from "../../scripts/helpers/utils";
 const path = require("path");
 import Logs from "node-logs";
 import { TroveManager } from "types/generated";
@@ -9,11 +13,15 @@ import * as helpers from "../../scripts/helpers/helpers";
 const deploymentName = getContractNameFromScriptFileName(path.basename(__filename));
 
 const func: DeployFunction = async (hre) => {
+    assertZeroDelayDeploymentCandidate(
+        await resolveZeroDelayDeploymentNetwork(hre),
+        deploymentName
+    );
     const {
         getNamedAccounts,
         ethers,
         deployments: { get, deploy, log, execute },
-        network
+        network,
     } = hre;
 
     const permit2Deployment = await get("Permit2");
@@ -38,14 +46,24 @@ const func: DeployFunction = async (hre) => {
         }
         if (network.tags.testnet) {
             console.log("testnet");
-            logger.information(`Initiating multisig tx to set TroveManagerRedeemOps in TroveManager....`)
+            logger.information(
+                `Initiating multisig tx to set TroveManagerRedeemOps in TroveManager....`
+            );
             // multisig tx
             const deployment = await get(deploymentName);
             const { deployer } = await getNamedAccounts();
             const multisigAddress = (await get("MultiSigWallet")).address;
-            const data = troveManager.interface.encodeFunctionData("setTroveManagerRedeemOps", [deployment.address]);
+            const data = troveManager.interface.encodeFunctionData("setTroveManagerRedeemOps", [
+                deployment.address,
+            ]);
 
-            await helpers.sendWithMultisig(hre, multisigAddress, troveManager.target.toString(), data, deployer);
+            await helpers.sendWithMultisig(
+                hre,
+                multisigAddress,
+                troveManager.target.toString(),
+                data,
+                deployer
+            );
         } else if (network.tags.mainnet) {
             // create SIP message
             console.log("mainnet");

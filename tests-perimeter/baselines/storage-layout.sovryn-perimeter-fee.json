@@ -1,8 +1,8 @@
 {
     "_meta": {
-        "purpose": "Storage-layout zero-diff baseline for the Zero surplus-claim exit fee.",
+        "purpose": "Storage-layout zero-diff baseline for the Zero surplus-claim exit fee AND the security-perimeter delay hooks.",
         "baseRef": "sovryn-perimeter-fee @ b6584a6",
-        "note": "Normalized solc storageLayout (AST id suffixes after ')' stripped) for the upgradeable BorrowerOperations and CollSurplusPool proxies plus ActivePool, captured from the UNMODIFIED b6584a6 tree, before the surplus-claim fee hook was applied. tests-perimeter/StorageLayout.zerodiff.test.js asserts the current tree's layout is identical — proving the hook appends NO state. Regenerate only on an intentional, reviewed layout change (see the test header).",
+        "note": "Normalized solc storageLayout (AST id suffixes after ')' stripped) for the upgradeable BorrowerOperations and CollSurplusPool proxies plus ActivePool, captured from the UNMODIFIED b6584a6 tree, before the surplus-claim fee hook and before the exit-delay hooks were applied. tests-perimeter/StorageLayout.zerodiff.test.js asserts the current tree's layout is identical \u2014 proving neither hook appends state (the controller and queue pointers live in EIP-1967 unstructured slots). Regenerate only on an intentional, reviewed layout change (see the test header). 2026-09-07 (W9a): contracts/TroveManager.sol:TroveManager added as a ZERO_DIFF target, captured from the same b6584a6 tree, because the Recovery-Mode liquidation fix makes TroveManager an upgraded implementation in the Phase 2 release; the fix changes no state.",
         "consumers": [
             "tests-perimeter/StorageLayout.zerodiff.test.js",
             "tests-perimeter/utils/storageLayout.js"
@@ -162,6 +162,164 @@
             "slot": "4",
             "offset": 0,
             "type": "t_mapping(t_address,t_uint256)"
+        }
+    ],
+    "contracts/TroveManager.sol:TroveManager": [
+        {
+            "label": "activePool",
+            "slot": "0",
+            "offset": 0,
+            "type": "t_contract(IActivePool)"
+        },
+        {
+            "label": "defaultPool",
+            "slot": "1",
+            "offset": 0,
+            "type": "t_contract(IDefaultPool)"
+        },
+        {
+            "label": "priceFeed",
+            "slot": "2",
+            "offset": 0,
+            "type": "t_contract(IPriceFeed)"
+        },
+        {
+            "label": "liquityBaseParams",
+            "slot": "3",
+            "offset": 0,
+            "type": "t_contract(ILiquityBaseParams)"
+        },
+        {
+            "label": "troveManagerRedeemOps",
+            "slot": "4",
+            "offset": 0,
+            "type": "t_address"
+        },
+        {
+            "label": "borrowerOperationsAddress",
+            "slot": "5",
+            "offset": 0,
+            "type": "t_address"
+        },
+        {
+            "label": "_stabilityPool",
+            "slot": "6",
+            "offset": 0,
+            "type": "t_contract(IStabilityPool)"
+        },
+        {
+            "label": "gasPoolAddress",
+            "slot": "7",
+            "offset": 0,
+            "type": "t_address"
+        },
+        {
+            "label": "collSurplusPool",
+            "slot": "8",
+            "offset": 0,
+            "type": "t_contract(ICollSurplusPool)"
+        },
+        {
+            "label": "_zusdToken",
+            "slot": "9",
+            "offset": 0,
+            "type": "t_contract(IZUSDToken)"
+        },
+        {
+            "label": "_zeroToken",
+            "slot": "10",
+            "offset": 0,
+            "type": "t_contract(IZEROToken)"
+        },
+        {
+            "label": "_zeroStaking",
+            "slot": "11",
+            "offset": 0,
+            "type": "t_contract(IZEROStaking)"
+        },
+        {
+            "label": "feeDistributor",
+            "slot": "12",
+            "offset": 0,
+            "type": "t_contract(IFeeDistributor)"
+        },
+        {
+            "label": "sortedTroves",
+            "slot": "13",
+            "offset": 0,
+            "type": "t_contract(ISortedTroves)"
+        },
+        {
+            "label": "baseRate",
+            "slot": "14",
+            "offset": 0,
+            "type": "t_uint256"
+        },
+        {
+            "label": "lastFeeOperationTime",
+            "slot": "15",
+            "offset": 0,
+            "type": "t_uint256"
+        },
+        {
+            "label": "Troves",
+            "slot": "16",
+            "offset": 0,
+            "type": "t_mapping(t_address,t_struct(Trove)_storage)"
+        },
+        {
+            "label": "totalStakes",
+            "slot": "17",
+            "offset": 0,
+            "type": "t_uint256"
+        },
+        {
+            "label": "totalStakesSnapshot",
+            "slot": "18",
+            "offset": 0,
+            "type": "t_uint256"
+        },
+        {
+            "label": "totalCollateralSnapshot",
+            "slot": "19",
+            "offset": 0,
+            "type": "t_uint256"
+        },
+        {
+            "label": "L_ETH",
+            "slot": "20",
+            "offset": 0,
+            "type": "t_uint256"
+        },
+        {
+            "label": "L_ZUSDDebt",
+            "slot": "21",
+            "offset": 0,
+            "type": "t_uint256"
+        },
+        {
+            "label": "rewardSnapshots",
+            "slot": "22",
+            "offset": 0,
+            "type": "t_mapping(t_address,t_struct(RewardSnapshot)_storage)"
+        },
+        {
+            "label": "TroveOwners",
+            "slot": "23",
+            "offset": 0,
+            "type": "t_array(t_address)dyn_storage"
+        },
+        {
+            "label": "lastETHError_Redistribution",
+            "slot": "24",
+            "offset": 0,
+            "type": "t_uint256"
+        },
+        {
+            "label": "lastZUSDDebtError_Redistribution",
+            "slot": "25",
+            "offset": 0,
+            "type": "t_uint256"
         }
     ]
 }

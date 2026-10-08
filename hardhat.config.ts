@@ -162,10 +162,11 @@ const config: HardhatUserConfig = {
                         runs: 100,
                     },
                     // Emit per-contract storageLayout so the Perimeter storage-layout
-                    // zero-diff regression (tests-perimeter/StorageLayout.zerodiff.test.js)
-                    // can assert the surplus-claim fee hook adds NO state to the
-                    // upgradeable BorrowerOperations / CollSurplusPool proxies or
-                    // ActivePool. Additive solc output; does not affect bytecode.
+                    // regression (tests-perimeter/StorageLayout.zerodiff.test.js)
+                    // validates unchanged existing proxy slots and the appended
+                    // BorrowerOperations companion pointer. Controller/queue
+                    // pointers live in unstructured slots. Additive solc output;
+                    // does not affect bytecode.
                     outputSelection: {
                         "*": {
                             "*": ["storageLayout"],

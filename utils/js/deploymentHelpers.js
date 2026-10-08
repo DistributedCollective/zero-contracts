@@ -13,6 +13,9 @@ const GasPool = artifacts.require("./GasPool.sol");
 const CollSurplusPool = artifacts.require("./CollSurplusPool.sol");
 const FunctionCaller = artifacts.require("./TestContracts/FunctionCaller.sol");
 const BorrowerOperations = artifacts.require("./BorrowerOperations.sol");
+const BorrowerOperationsPerimeterOps = artifacts.require(
+    "./Dependencies/BorrowerOperationsPerimeterOps.sol"
+);
 const HintHelpers = artifacts.require("./HintHelpers.sol");
 const FeeDistributor = artifacts.require("./FeeDistributor.sol");
 
@@ -114,6 +117,9 @@ class DeploymentHelper {
     const collSurplusPool = await CollSurplusPool.new();
     const functionCaller = await FunctionCaller.new();
     const borrowerOperations = await BorrowerOperations.new(permit2.address);
+    await borrowerOperations.setPerimeterOps(
+        (await BorrowerOperationsPerimeterOps.new()).address
+    );
     const hintHelpers = await HintHelpers.new();
     const zusdToken = await ZUSDToken.new();
     const feeDistributor = await FeeDistributor.new();
@@ -279,6 +285,9 @@ class DeploymentHelper {
     const collSurplusPool = await CollSurplusPool.new();
     const functionCaller = await FunctionCaller.new();
     const borrowerOperations = await BorrowerOperations.new(permit2.address);
+    await borrowerOperations.setPerimeterOps(
+        (await BorrowerOperationsPerimeterOps.new()).address
+    );
     const hintHelpers = await HintHelpers.new();
     const zusdToken = await ZUSDToken.new();
     const feeDistributor = await FeeDistributor.new();
