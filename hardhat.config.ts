@@ -194,7 +194,7 @@ const config: HardhatUserConfig = {
     namedAccounts: {
         deployer: {
             default: 0,
-            rskSovrynMainnet: 1,
+            //rskSovrynMainnet: 1,
         },
         signer: {
             default: 1,
