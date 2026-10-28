@@ -319,6 +319,72 @@ describe("Zero delay deployment frozen scope", function () {
         assert.deepEqual(hre.calls, []);
     });
 
+    it("reuses actual observed mainnet proxy records on repeated staging without deploying proxies or saving records", async function () {
+        const recordRoot = path.resolve(__dirname, "../deployment/deployments/rskSovrynMainnet");
+        const records = Object.fromEntries(
+            fs
+                .readdirSync(recordRoot)
+                .filter((name) => name.endsWith(".json"))
+                .map((name) => [
+                    name.slice(0, -5),
+                    JSON.parse(fs.readFileSync(path.join(recordRoot, name), "utf8")),
+                ])
+        );
+        const deployCalls = [];
+        const hre = {
+            network: release,
+            deployments: {
+                getOrNull: async (name) => records[name] || null,
+                get: async (name) => records[name],
+                log: () => {},
+                save: async () => {
+                    throw new Error("UNEXPECTED_RECORD_SAVE");
+                },
+                deploy: async (name) => {
+                    assert.ok(
+                        tags.slice(0, 3).some((logic) => name === `${logic}_Implementation`),
+                        name
+                    );
+                    const record = records[name];
+                    assert.ok(record.bytecode && record.receipt && record.metadata, name);
+                    deployCalls.push(name);
+                    return { ...record, newlyDeployed: false };
+                },
+            },
+            ethers: {
+                provider: { getCode: async () => "0x6000" },
+                getContractAt: async (_, address) => ({
+                    getImplementation: async () => {
+                        const name = tags
+                            .slice(0, 3)
+                            .find((name) => records[`${name}_Proxy`].address === address);
+                        assert.ok(name);
+                        return records[`${name}_Implementation`].address;
+                    },
+                }),
+                getContract: async (name) => ({
+                    getImplementation: async () =>
+                        records[name.replace(/_Proxy$/, "_Implementation")].address,
+                    setImplementation: async () => {
+                        throw new Error("UNEXPECTED_UPGRADE");
+                    },
+                }),
+                isAddress: () => false,
+            },
+        };
+        for (let pass = 0; pass < 2; pass++) {
+            for (const name of tags.slice(0, 3)) {
+                assert.ok(records[`${name}_Proxy`].linkedData.recordKind.startsWith("observed-"));
+                assert.equal(records[`${name}_Proxy`].bytecode, undefined);
+                await helper().deployWithCustomProxy(hre, "deployer", name, "UpgradableProxy");
+            }
+        }
+        assert.deepEqual(
+            deployCalls,
+            [...tags.slice(0, 3), ...tags.slice(0, 3)].map((name) => `${name}_Implementation`)
+        );
+    });
+
     it("the real proxy helper rejects an incomplete release packet before staging its first candidate", async function () {
         const hre = fixture("CollSurplusPool_Proxy");
         hre.deployments.deploy = async () => {

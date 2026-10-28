@@ -1,11 +1,16 @@
 {
-    "_format": "hh-sol-artifact-1",
-    "contractName": "GasPool",
-    "sourceName": "contracts/GasPool.sol",
     "address": "0x58Aa11ED8d9C8574b5E2D201dc1A56f1E2155735",
     "abi": [],
-    "bytecode": "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea264697066735822122066e9d13e845a93dc2501d42df6e2e92fe003bd0b9c468fc3e0baf1634cbfcecf64736f6c634300060b0033",
-    "deployedBytecode": "0x6080604052600080fdfea264697066735822122066e9d13e845a93dc2501d42df6e2e92fe003bd0b9c468fc3e0baf1634cbfcecf64736f6c634300060b0033",
-    "linkReferences": {},
-    "deployedLinkReferences": {}
+    "deployedBytecode": "0x6080604052600080fdfea26469706673582212208483bf8911ca4815bae1fe361c6785559baa6a0f27112a9a3991a9a37a88cb2c64736f6c634300060b0033",
+    "linkedData": {
+        "recordKind": "observed-contract-runtime",
+        "chainId": 30,
+        "blockNumber": 9364684,
+        "blockHash": "0x17059cdc4457871b10e04f859dcce94b3306c28c7a9e04c8a3c75074e4c58f5f",
+        "observedAtUtc": "2026-10-28T20:25:05.363Z",
+        "runtimeCodeHash": "0x88e908465685c19c941a4617ff7daae043abcdb4cf00226796515b73422a84f6",
+        "creationProvenance": "Not asserted; the previous compiled template or mismatched creation record is preserved separately.",
+        "historicalTemplate": "../../baselines/pre-record-refresh-rskSovrynMainnet/GasPool.json",
+        "historicalTemplateSha256": "dc9993d6902f97a8e3af918ed7f7a81eb4911f49667e79e4abb1396b23f60e74"
+    }
 }
