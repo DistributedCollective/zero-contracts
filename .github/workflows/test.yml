@@ -24,9 +24,9 @@ jobs:
       matrix:
         include:
           - suite: liquity
-            command: yarn hardhat test
+            command: yarn hardhat test --no-compile
           - suite: perimeter
-            command: yarn hardhat test tests-perimeter/*.test.js
+            command: yarn hardhat test --no-compile tests-perimeter/*.test.js
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,9 @@ jobs:
           fi
 
       - name: Compile
-        run: yarn hardhat compile
+        # Hardhat 2.17 can expose a fresh compiler before chmod completes when
+        # compilation jobs download concurrently. Serialize cold-cache builds.
+        run: yarn hardhat compile --concurrency 1
 
       - name: Test
         run: ${{ matrix.command }}
