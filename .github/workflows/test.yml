@@ -1,0 +1,61 @@
+name: Tests
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The hardhat config decrypts an optional secrets env on load and prompts
+  # for a password when it is absent; a runner has no terminal to answer.
+  __decryptionAlreadyDone__: "TRUE"
+  NODE_OPTIONS: --max-old-space-size=4096
+
+jobs:
+  test:
+    name: ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: liquity
+            command: yarn hardhat test
+          - suite: perimeter
+            command: yarn hardhat test tests-perimeter/*.test.js
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Cache Solidity compilers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hardhat-nodejs
+          key: hardhat-compilers-${{ runner.os }}-${{ hashFiles('hardhat.config.ts') }}
+          restore-keys: hardhat-compilers-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Restore compiler execute bits
+        # A cache restore can drop the execute bit on the downloaded solc
+        # binaries; hardhat then fails to spawn them.
+        run: |
+          if [ -d "$HOME/.cache/hardhat-nodejs" ]; then
+            find "$HOME/.cache/hardhat-nodejs" -type f -name 'solc-*' -exec chmod +x {} +
+          fi
+
+      - name: Compile
+        run: yarn hardhat compile
+
+      - name: Test
+        run: ${{ matrix.command }}

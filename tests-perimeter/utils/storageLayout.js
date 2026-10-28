@@ -13,10 +13,10 @@ const hre = require("hardhat");
 const normType = (t) => (typeof t === "string" ? t.replace(/\)[0-9]+/g, ")") : t);
 
 // Return a stable, comparable array of {label, slot, offset, type} for the
-// contract's declared state variables. Throws (never silently empties) if the
-// layout is missing/empty — an empty layout compared to an empty layout is a
-// silent false PASS, which would make this guard useless.
-async function normalizedLayout(fqName) {
+// contract's declared state variables. Throws if the layout is missing, but
+// ALLOWS an empty one: a contract that declares no storage is a real and
+// checkable property (the delegatecall companion depends on it).
+async function rawLayout(fqName) {
     const bi = await hre.artifacts.getBuildInfo(fqName);
     if (!bi) throw new Error(`no build-info for ${fqName} (compile with storageLayout enabled)`);
     const [source, name] = fqName.split(":");
@@ -25,11 +25,6 @@ async function normalizedLayout(fqName) {
     const layout = artifact.storageLayout;
     if (!layout || !Array.isArray(layout.storage)) {
         throw new Error(`no storageLayout for ${fqName} — is "storageLayout" in outputSelection?`);
-    }
-    if (layout.storage.length === 0) {
-        throw new Error(
-            `${fqName} storageLayout has ZERO entries — refusing to treat as zero-diff (silent false pass)`
-        );
     }
     return layout.storage
         .map((s) => ({
@@ -46,4 +41,17 @@ async function normalizedLayout(fqName) {
         );
 }
 
-module.exports = { normalizedLayout, normType };
+// Same as `rawLayout`, but refuses an empty layout: comparing an empty layout
+// against an empty baseline is a silent false PASS, which would make the
+// zero-diff and append-only guards useless.
+async function normalizedLayout(fqName) {
+    const layout = await rawLayout(fqName);
+    if (layout.length === 0) {
+        throw new Error(
+            `${fqName} storageLayout has ZERO entries — refusing to treat as zero-diff (silent false pass)`
+        );
+    }
+    return layout;
+}
+
+module.exports = { normalizedLayout, rawLayout, normType };

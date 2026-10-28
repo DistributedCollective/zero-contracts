@@ -16,11 +16,16 @@
             "es2016",
             "es2017"
         ],
-        "baseUrl": ".",
         "rootDir": ".",
         "paths": {
             "@utils/*": [
-                "test-utils/*"
+                "./test-utils/*"
+            ],
+            "scripts/*": [
+                "./scripts/*"
+            ],
+            "types/*": [
+                "./types/*"
             ]
         },
         "allowJs": false

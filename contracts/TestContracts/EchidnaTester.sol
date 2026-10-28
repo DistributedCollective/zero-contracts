@@ -9,6 +9,7 @@ import "../TroveManager.sol";
 import "../TroveManagerStorage.sol";
 import "../Dependencies/TroveManagerRedeemOps.sol";
 import "../BorrowerOperations.sol";
+import "../Dependencies/BorrowerOperationsPerimeterOps.sol";
 import "../ActivePool.sol";
 import "../DefaultPool.sol";
 import "../StabilityPool.sol";
@@ -58,6 +59,7 @@ contract EchidnaTester {
         troveManagerRedeemOps = new TroveManagerRedeemOps(14 * 86400, _permit2);
         troveManager = new TroveManager(14 days, _permit2);
         borrowerOperations = new BorrowerOperations(_permit2);
+        borrowerOperations.setPerimeterOps(address(new BorrowerOperationsPerimeterOps()));
         activePool = new ActivePool();
         defaultPool = new DefaultPool();
         stabilityPool = new StabilityPool(_permit2);

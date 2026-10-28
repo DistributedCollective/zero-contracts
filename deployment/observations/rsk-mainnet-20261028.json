@@ -1,0 +1,292 @@
+{
+    "chainId": 30,
+    "observedAtUtc": "2026-10-28T20:25:05.363Z",
+    "blockNumber": 9364684,
+    "blockHash": "0x17059cdc4457871b10e04f859dcce94b3306c28c7a9e04c8a3c75074e4c58f5f",
+    "records": [
+        {
+            "file": "ActivePool.json",
+            "address": "0xf294ea272d6f8FedC08aCf8E93ff50fe99E1f7E8",
+            "abiSha256": "c578d010cfaf193b2c81ee39ee40993283ba546940daba95359208106460a209",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x14c7357E1AC73E5A88E33AA3d06707795311B391",
+            "implementationRuntimeCodeHash": "0x9b4cf35c18a3a98a9233266c8223e274330d1f75d57ea70ac21e9642ba3c5c8b"
+        },
+        {
+            "file": "ActivePool_Proxy.json",
+            "address": "0xf294ea272d6f8FedC08aCf8E93ff50fe99E1f7E8",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "BorrowerOperations.json",
+            "address": "0x5B9dB4B8bdeF3e57323187a9AC2639C5DEe5FD39",
+            "abiSha256": "ceb96ed4167d5ee4b7b5132f0350798522dc72e593d79786abeedf3de9b6eeba",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x8d69F344c051a73671Aef27D7695dF52C0bD7f7e",
+            "implementationRuntimeCodeHash": "0xd75fb5d99f4c1c1f6a05a55a69cbbada60c734c379e3496aca71163f7202208e"
+        },
+        {
+            "file": "BorrowerOperationsPerimeterOps.json",
+            "address": "0x3dCecd9c0524bBA3990DCB403601Ee5Ea1136bf8",
+            "abiSha256": "8c66c7fcbda5999b026f8e9a92799a3b0a1a7b52f4674a3eb6cfd2efe77a3d85",
+            "runtimeCodeHash": "0x1814f9675203f28df6f8d27c9517907b2fd5e95f2127b7ad49828413513c2296"
+        },
+        {
+            "file": "BorrowerOperations_Implementation.json",
+            "address": "0x8d69F344c051a73671Aef27D7695dF52C0bD7f7e",
+            "abiSha256": "ceb96ed4167d5ee4b7b5132f0350798522dc72e593d79786abeedf3de9b6eeba",
+            "runtimeCodeHash": "0xd75fb5d99f4c1c1f6a05a55a69cbbada60c734c379e3496aca71163f7202208e"
+        },
+        {
+            "file": "BorrowerOperations_Proxy.json",
+            "address": "0x5B9dB4B8bdeF3e57323187a9AC2639C5DEe5FD39",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "CollSurplusPool.json",
+            "address": "0x310ec7Fe6e4943DA773De8948255E37CC45e34bb",
+            "abiSha256": "dbf149e31a314ac97a3d9ca4671feb3fefc18f0506b18fa5f1efe4ad906527af",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0xDf0391a2bE429091D878a09753fCD3eB04C32149",
+            "implementationRuntimeCodeHash": "0xfdf215b711c9b7f2a2aa8367520e9f14d65bca9d21fc1ddb65673338525fb9db"
+        },
+        {
+            "file": "CollSurplusPool_Implementation.json",
+            "address": "0xDf0391a2bE429091D878a09753fCD3eB04C32149",
+            "abiSha256": "dbf149e31a314ac97a3d9ca4671feb3fefc18f0506b18fa5f1efe4ad906527af",
+            "runtimeCodeHash": "0xfdf215b711c9b7f2a2aa8367520e9f14d65bca9d21fc1ddb65673338525fb9db"
+        },
+        {
+            "file": "CollSurplusPool_Proxy.json",
+            "address": "0x310ec7Fe6e4943DA773De8948255E37CC45e34bb",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "CommunityIssuance.json",
+            "address": "0x9b38044A276fED8bC1703bd4a2DA1b17F2c61d16",
+            "abiSha256": "d1a76efc31bc3092e12e4a6f1018f38ce97974d54ae3fa2238e117988ceddf58",
+            "runtimeCodeHash": "0xdbdb9d5f9b7372447a5cbc35c059b972c4e6c8f6dec8d51733ded9c0969d9e19",
+            "implementation": "0x5059A057df377436Fc9b68369b696A23cc61Ecc3",
+            "implementationRuntimeCodeHash": "0x019eff1ccf4b371b95ab4e3576630210e0d044bd0f54a162be0ce94e38266892"
+        },
+        {
+            "file": "CommunityIssuance_Implementation.json",
+            "address": "0x5059A057df377436Fc9b68369b696A23cc61Ecc3",
+            "abiSha256": "d1a76efc31bc3092e12e4a6f1018f38ce97974d54ae3fa2238e117988ceddf58",
+            "runtimeCodeHash": "0x019eff1ccf4b371b95ab4e3576630210e0d044bd0f54a162be0ce94e38266892"
+        },
+        {
+            "file": "CommunityIssuance_Proxy.json",
+            "address": "0x9b38044A276fED8bC1703bd4a2DA1b17F2c61d16",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0xdbdb9d5f9b7372447a5cbc35c059b972c4e6c8f6dec8d51733ded9c0969d9e19"
+        },
+        {
+            "file": "DefaultPool.json",
+            "address": "0xcdbA14ca707B99afb8CA93E178aD614Db422a030",
+            "abiSha256": "1e9ae07abdef966e5a6c27becdec01d6fe1bcc99d8a00b1b46b7139ae34e54c8",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x12BaF6f8151bd26f22E4AE1Df3cef6746840da93",
+            "implementationRuntimeCodeHash": "0x87ec1e164ce5b6e425fb3e318a1546aa7064b153a2a9e1bd09c06193f7d4fe7b"
+        },
+        {
+            "file": "DefaultPool_Proxy.json",
+            "address": "0xcdbA14ca707B99afb8CA93E178aD614Db422a030",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "FeeDistributor.json",
+            "address": "0x1261d5872d56e2Ab61B3C68451D015b752105027",
+            "abiSha256": "65e48c9cbdd6bf975d3eadc02748b50ea266a08a2042a47722c64f720de0e38e",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x006a2D407b3e5D54E0A835877cdC2F043e3E7296",
+            "implementationRuntimeCodeHash": "0x7719dea231c86d2f2a43a187d3aa63a953c820aad7c4ac418c8640b6099839c1"
+        },
+        {
+            "file": "FeeDistributor_Proxy.json",
+            "address": "0x1261d5872d56e2Ab61B3C68451D015b752105027",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "GasPool.json",
+            "address": "0x58Aa11ED8d9C8574b5E2D201dc1A56f1E2155735",
+            "abiSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "runtimeCodeHash": "0x88e908465685c19c941a4617ff7daae043abcdb4cf00226796515b73422a84f6"
+        },
+        {
+            "file": "HintHelpers.json",
+            "address": "0x1D7DaC5a63A35540bE9e031212ecf39584AE5595",
+            "abiSha256": "c60f9af365049fdb4ae068ad7d6836f2f9e48474e1101cef1f8f411630bef101",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x772Be98F08374a6fb688f0F9eC5CDbfC8a6cCB97",
+            "implementationRuntimeCodeHash": "0xef81a6049ae0a5619707e8880340de1ea400c7356de41232c7f939eaff7ee5ee"
+        },
+        {
+            "file": "HintHelpers_Proxy.json",
+            "address": "0x1D7DaC5a63A35540bE9e031212ecf39584AE5595",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "LiquityBaseParams.json",
+            "address": "0xf8B04A36c36d5DbD1a9Fe7B74897c609d6A17aa2",
+            "abiSha256": "3ace3f786436e92473f7370417df0fe2206943c5a21899fd6dbd2c90cc9f363e",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x4584A4f903821ebC9e83aaC129d5Af12d9024C3b",
+            "implementationRuntimeCodeHash": "0x64d6c699fb93192399eab139b7415d78b699ad97660fb4b7cc8df21952429c0b"
+        },
+        {
+            "file": "LiquityBaseParams_Proxy.json",
+            "address": "0xf8B04A36c36d5DbD1a9Fe7B74897c609d6A17aa2",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "MultiTroveGetter.json",
+            "address": "0xF265a169191348c02829B62650B025BdeAf00AE4",
+            "abiSha256": "eb4bc3369b9db4b0a65c7711fe726143fed4dfdc37f148f8c6adc624f812481b",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x5E18262ccacF8F5c1113507fBf3Af0216533676F",
+            "implementationRuntimeCodeHash": "0x1e761cc6e1c826b5b618c93aaf4b718bf48a8e9b9889cfaf9eedff05142471da"
+        },
+        {
+            "file": "MultiTroveGetter_Proxy.json",
+            "address": "0xF265a169191348c02829B62650B025BdeAf00AE4",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "PriceFeed.json",
+            "address": "0x6D1d9574d67e04cf35Fa1d916F763eDDae03b75d",
+            "abiSha256": "eb3433f7bb9fe07e8bdf097389bf3edda50b38a058e9bb0e870b6d73974fc886",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x867303dfCd696BE516f9C4023525F1107d903356",
+            "implementationRuntimeCodeHash": "0x235b294366ebeba0ebb438049fb4febb14e0ce4792fcb5a9c996e5a9d8895181"
+        },
+        {
+            "file": "PriceFeed_Implementation.json",
+            "address": "0x867303dfCd696BE516f9C4023525F1107d903356",
+            "abiSha256": "eb3433f7bb9fe07e8bdf097389bf3edda50b38a058e9bb0e870b6d73974fc886",
+            "runtimeCodeHash": "0x235b294366ebeba0ebb438049fb4febb14e0ce4792fcb5a9c996e5a9d8895181"
+        },
+        {
+            "file": "PriceFeed_Proxy.json",
+            "address": "0x6D1d9574d67e04cf35Fa1d916F763eDDae03b75d",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "SortedTroves.json",
+            "address": "0xdeEB95480B94f9395514Fe35CAF692A1C788DfE9",
+            "abiSha256": "801e3d4f0e370c3b1da110dc4283e9aef5c7e4d969b87b1ccbc9a4d27d25abad",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x6dCC9c917a77C836057452dcC16A4e4F0A8ee2Dc",
+            "implementationRuntimeCodeHash": "0x0ae7af77640636661a2d5bc3bcd842b46aaa786ea1ab60db7268ff80ef3cf0b4"
+        },
+        {
+            "file": "SortedTroves_Proxy.json",
+            "address": "0xdeEB95480B94f9395514Fe35CAF692A1C788DfE9",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "StabilityPool.json",
+            "address": "0xd46C0225D1331B46700d64fF8c906709D15C9202",
+            "abiSha256": "9294c48c2f283aa65f64f32a5b6c12c47ff7a026a5a9b3f9b84bc1fa5b270f95",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x2a1950a06AD5C5113e44721820305645d671eC4F",
+            "implementationRuntimeCodeHash": "0x4dee6483dc28daab532fcb43176b287acffc95a52dad5a5a9276115c40a979fa"
+        },
+        {
+            "file": "StabilityPool_Implementation.json",
+            "address": "0x2a1950a06AD5C5113e44721820305645d671eC4F",
+            "abiSha256": "ebe50c794a26dc5759438a74335a52bcbfd48852c8094b695836aebe2c6a2924",
+            "runtimeCodeHash": "0x4dee6483dc28daab532fcb43176b287acffc95a52dad5a5a9276115c40a979fa"
+        },
+        {
+            "file": "StabilityPool_Proxy.json",
+            "address": "0xd46C0225D1331B46700d64fF8c906709D15C9202",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "TroveManager.json",
+            "address": "0x82B09695ee4F214f3A0803683C4AaEc332E4E0a3",
+            "abiSha256": "ad863a7001c1a892391d14bf7a86dc593150035850443ce2570489cd3012c5b1",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x57219Dd6c9e869750c23e4043C62562dc6Fd1EC4",
+            "implementationRuntimeCodeHash": "0xc0d51f46fe9cc84ad6d826fd8f82b4cc91015d86c74dbf45d1f01c70cb429922"
+        },
+        {
+            "file": "TroveManagerRedeemOps.json",
+            "address": "0xa4161D23002e110b3d5C430EfAfF299415074c67",
+            "abiSha256": "f971beef9b71a4d9c98d5839072f27883378ee6de8dfa6a972c97ae0e3053f58",
+            "runtimeCodeHash": "0xd7fba2078c654c0fb0837f8c171615b6c980b333a98146b6d73fa01d45f3460c"
+        },
+        {
+            "file": "TroveManager_Implementation.json",
+            "address": "0x57219Dd6c9e869750c23e4043C62562dc6Fd1EC4",
+            "abiSha256": "ad863a7001c1a892391d14bf7a86dc593150035850443ce2570489cd3012c5b1",
+            "runtimeCodeHash": "0xc0d51f46fe9cc84ad6d826fd8f82b4cc91015d86c74dbf45d1f01c70cb429922"
+        },
+        {
+            "file": "TroveManager_Proxy.json",
+            "address": "0x82B09695ee4F214f3A0803683C4AaEc332E4E0a3",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "ZEROStaking.json",
+            "address": "0x5369941b2a08db3feC31C4a6cD3b902f7b1468A3",
+            "abiSha256": "305bdc0dc79495aa62afda83ad9b7fb41ce766a2ae0098476f82c0e6ee3c367f",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0xe09e12dEb814e1569101890b401A71A873BFd33e",
+            "implementationRuntimeCodeHash": "0xf2d7fa33df1a1fa9590456fe7c85d0b4009b71be2db0e92b826f82d502bb2938"
+        },
+        {
+            "file": "ZEROStaking_Proxy.json",
+            "address": "0x5369941b2a08db3feC31C4a6cD3b902f7b1468A3",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "ZEROToken.json",
+            "address": "0x5815D304D67Ad9240fe273452078Bd648e75e543",
+            "abiSha256": "9d2553b8553b2c7129297406456f1ebed87926dbd4d86b35c5c391db68dba52c",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0x451291D48f23782cb5609cEd5A195b0C92EdDC7B",
+            "implementationRuntimeCodeHash": "0x6b9a35e173a7ece280cc329ca9a5c60b8605e3ae49c87f86f6af5aa6b1f33cd6"
+        },
+        {
+            "file": "ZEROToken_Proxy.json",
+            "address": "0x5815D304D67Ad9240fe273452078Bd648e75e543",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        },
+        {
+            "file": "ZUSDToken.json",
+            "address": "0xdB107FA69E33f05180a4C2cE9c2E7CB481645C2d",
+            "abiSha256": "8dca83407c121af95bc647b1d591c391b4b35fe96c6824ed0e1cd3c745bb9205",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5",
+            "implementation": "0xc0B70D65A665911B0D6Dbd1eD58094F9c85F5A39",
+            "implementationRuntimeCodeHash": "0x41a63d785aa357c11a0230f195989bd93b0481a9e80fb230027e1d93368c88b6"
+        },
+        {
+            "file": "ZUSDToken_Implementation.json",
+            "address": "0xc0B70D65A665911B0D6Dbd1eD58094F9c85F5A39",
+            "abiSha256": "8dca83407c121af95bc647b1d591c391b4b35fe96c6824ed0e1cd3c745bb9205",
+            "runtimeCodeHash": "0x41a63d785aa357c11a0230f195989bd93b0481a9e80fb230027e1d93368c88b6"
+        },
+        {
+            "file": "ZUSDToken_Proxy.json",
+            "address": "0xdB107FA69E33f05180a4C2cE9c2E7CB481645C2d",
+            "abiSha256": "cbd0f406f91e09e364d64a212b17f93d0838db8388926d2ea03909bed7e2b046",
+            "runtimeCodeHash": "0x577b60873bd1f538cb301bf0ede6c0a03869e4066386569ccb8265e0521048a5"
+        }
+    ]
+}

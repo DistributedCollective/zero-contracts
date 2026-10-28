@@ -60,3 +60,7 @@ external/
 .eslintrc
 .eslintrc.json
 .eslintignore
+
+# Preserve exact historical deployment snapshots and compiler inputs.
+deployment/baselines/pre-record-refresh-rskSovrynMainnet/
+deployment/deployments/rskSovrynMainnet/solcInputs/
