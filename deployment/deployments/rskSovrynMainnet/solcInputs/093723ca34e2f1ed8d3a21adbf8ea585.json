@@ -1,0 +1,38 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/zero/ZeroEmergencyHalt.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.5.17;\n\n/// @notice Reverts every delegated request while native proxy administration remains available.\ncontract ZeroEmergencyHalt {\n    function() external payable {\n        revert(\"Zero: emergency shutdown\");\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "storageLayout",
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    },
+    "remappings": [
+      "forge-std/=foundry/lib/forge-std/src/"
+    ]
+  }
+}

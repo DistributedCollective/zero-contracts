@@ -36,3 +36,10 @@ node --test tests-perimeter/DeploymentRecords.current.test.js
 The dated observation manifest includes every recorded mainnet address and its
 interface hash. Before an operation, verify the current network, pointers, code
 and policy state separately. Testnet records are unchanged by this mainnet update.
+
+The deployed `ZeroEmergencyHalt` record references its exact Solidity 0.5.17
+standard JSON input in `rskSovrynMainnet/solcInputs`. That input preserves the
+original `contracts/zero/ZeroEmergencyHalt.sol` source key, optimizer settings
+and metadata. The source is now maintained under `contracts/ZERO/`; a normal
+Zero build uses different settings and source-path metadata and must not be
+assumed to reproduce the deployed bytecode.
