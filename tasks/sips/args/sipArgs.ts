@@ -452,7 +452,6 @@ const sip0075 = async (hre: HardhatRuntimeEnvironment): Promise<ISipArgument> =>
     ## License
 
     Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
-
     `;
     const description: string = `${title}\n${link}\n${summary}\n---\n${text}`;
     return {
@@ -599,6 +598,51 @@ const sipSOV3564 = async (hre: HardhatRuntimeEnvironment): Promise<ISipArgument>
     };
 
     return args;
+};
+
+const sip0082 = async (hre: HardhatRuntimeEnvironment): Promise<ISipArgument> => {
+    const { ethers, deployments } = hre;
+
+    const zeroBaseParamsContract = await deployments.get("LiquityBaseParams");
+    const newBorrowingFeeFloor = ethers.parseEther("0.05");
+    const encodedNewBorrowingFeeFloor = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256"],
+        [newBorrowingFeeFloor]
+    );
+    const title = "SIP-0082: Reduce Zero Origination Fee Floor to 5%";
+    const link = "https://forum.sovryn.com/t/sip-0082-reduce-zero-origination-fee-floor-to-5";
+    const summary = "Reduce Zero Origination Fee Floor from 8% to 5%";
+    const text = `
+    ## Summary
+
+    If approved, this proposal will reduce the ZUSD origination fee floor in the Sovryn Zero protocol from 8% to 5%.
+
+    ## Motivation
+
+    The Zero Protocol is still in the bootstrap period. We should focus on growing the ZUSD/DLLR supply. The 2% to 5% redemption percentage per month is generally acceptable. For the past 30 days, there were about 7.2 BTC redemptions (~1.3%), even with fairly volatile BTC price movement. The level of redemption is generally low. Given incoming liquidity easing, the condition is perfect for reducing the origination fee. With a lower origination fee, we will likely see an increase in ZUSD supply and protocol revenue.
+
+    ## Proposed Changes
+
+    If approved, the origination fee will fluctuate between 5% and 100%. The following change will be made to the Zero Protocol base parameters:
+
+    It will update "BORROWING_FEE_FLOOR" from 8% to 5% by calling \`setBorrowingFeeFloor(uint256)\` on the \`0xf8B04A36c36d5DbD1a9Fe7B74897c609d6A17aa2\` contract with the encoded data \`0x00000000000000000000000000000000000000000000000000b1a2bc2ec50000\`.
+
+    ## License
+
+    Copyright and related rights waived via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+    `;
+
+    const description: string = `${title}\n${link}\n${summary}\n---\n${text}`;
+    return {
+        args: {
+            targets: [zeroBaseParamsContract.address],
+            values: [0],
+            signatures: ["setBorrowingFeeFloor(uint256)"],
+            data: [encodedNewBorrowingFeeFloor],
+            description: description,
+        },
+        governor: "GovernorOwner",
+    };
 };
 
 const sipArgs = {
